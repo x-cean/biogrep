@@ -9,6 +9,7 @@
     "core:default",
     "opener:default",
     "shell:default",
+    "shell:allow-kill",
     {
       "identifier": "shell:allow-spawn",
       "allow": [
