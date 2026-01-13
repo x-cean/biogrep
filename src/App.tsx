@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Command } from "@tauri-apps/plugin-shell";
+import { openPath } from "@tauri-apps/plugin-opener";
 
 interface SearchResult {
   path: string;
@@ -101,7 +102,7 @@ function App() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search content (min 2 chars)..."
-            className="flex-1 px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 outline-none text-sm"
+            className="flex-1 px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 outline-none text-sm placeholder:text-gray-500 placeholder:italic"
             autoFocus
           />
           <input
@@ -109,7 +110,7 @@ function App() {
             value={searchPath}
             onChange={(e) => setSearchPath(e.target.value)}
             placeholder="/Users/xhome/VBProjects"
-            className="w-80 px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 outline-none text-sm"
+            className="w-80 px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 outline-none text-sm placeholder:text-gray-500 placeholder:italic"
           />
         </div>
 
@@ -128,9 +129,11 @@ function App() {
         {results.map((r, i) => (
           <div
             key={i}
-            className="flex gap-2 hover:bg-gray-800 px-2 py-1 rounded cursor-pointer"
+            onClick={() => openPath(r.path)}
+            title={r.path}
+            className="flex gap-2 hover:bg-gray-800 px-2 py-1 rounded cursor-pointer active:bg-gray-700"
           >
-            <span className="text-gray-500 truncate w-36 shrink-0">
+            <span className="text-blue-400 truncate w-40 shrink-0 hover:underline">
               {r.path.split("/").pop()}
             </span>
             <span className="text-yellow-500 shrink-0 w-10 text-right">
