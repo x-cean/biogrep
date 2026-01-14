@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Command } from "@tauri-apps/plugin-shell";
+import { Command, Child } from "@tauri-apps/plugin-shell";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Virtuoso } from "react-virtuoso";
 
@@ -28,10 +28,33 @@ function App() {
   const [activeTab, setActiveTab] = useState<"files" | "content">("content");
 
   const searchIdRef = useRef(0);
+  const fdChildRef = useRef<Child | null>(null);
+  const rgChildRef = useRef<Child | null>(null);
+
+  // Kill any running search processes
+  async function killPreviousSearches() {
+    if (fdChildRef.current) {
+      try {
+        await fdChildRef.current.kill();
+      } catch {
+        // Process may have already exited
+      }
+      fdChildRef.current = null;
+    }
+    if (rgChildRef.current) {
+      try {
+        await rgChildRef.current.kill();
+      } catch {
+        // Process may have already exited
+      }
+      rgChildRef.current = null;
+    }
+  }
 
   // Debounced search - waits 300ms after typing stops
   useEffect(() => {
     if (!query.trim() || query.length < 2 || !searchPath.trim()) {
+      killPreviousSearches();
       setResults([]);
       setFileResults([]);
       setError("");
@@ -43,6 +66,9 @@ function App() {
   }, [query, searchPath]);
 
   async function runSearch() {
+    // Kill any previous searches before starting new ones
+    await killPreviousSearches();
+
     const currentSearchId = ++searchIdRef.current;
 
     setLoading(true);
@@ -75,22 +101,36 @@ function App() {
         "--max-results",
         String(MAX_FILE_RESULTS),
       ]);
-      const output = await command.execute();
 
-      if (searchIdRef.current !== currentSearchId) return;
+      let stdout = "";
 
-      if (output.stdout) {
-        const lines = output.stdout.split("\n").filter((line) => line.trim());
-        const newFileResults: FileResult[] = lines.map((path) => ({
-          path: path.trim(),
-          filename: path.split("/").pop() || path,
-        }));
-        setFileResults(newFileResults);
-      }
+      command.on("close", () => {
+        if (searchIdRef.current !== currentSearchId) return;
 
-      if (output.stderr && output.code !== 0) {
-        console.error("fd error:", output.stderr);
-      }
+        if (stdout) {
+          const lines = stdout.split("\n").filter((line) => line.trim());
+          const newFileResults: FileResult[] = lines
+            .slice(0, MAX_FILE_RESULTS)
+            .map((path) => ({
+              path: path.trim(),
+              filename: path.split("/").pop() || path,
+            }));
+          setFileResults(newFileResults);
+        }
+        fdChildRef.current = null;
+      });
+
+      command.stdout.on("data", (data) => {
+        if (searchIdRef.current === currentSearchId) {
+          stdout += data;
+        }
+      });
+
+      command.stderr.on("data", (data) => {
+        console.error("fd stderr:", data);
+      });
+
+      fdChildRef.current = await command.spawn();
     } catch (err) {
       console.error("fd search failed:", err);
     }
@@ -105,40 +145,54 @@ function App() {
         query,
         searchPath,
       ]);
-      const output = await command.execute();
 
-      if (searchIdRef.current !== currentSearchId) return;
+      let stdout = "";
 
-      const newResults: SearchResult[] = [];
+      command.on("close", () => {
+        if (searchIdRef.current !== currentSearchId) return;
 
-      if (output.stdout) {
-        const lines = output.stdout.split("\n");
+        const newResults: SearchResult[] = [];
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          if (newResults.length >= MAX_RESULTS) break;
+        if (stdout) {
+          const lines = stdout.split("\n");
 
-          try {
-            const json = JSON.parse(line);
-            if (json.type === "match" && json.data) {
-              const d = json.data;
-              newResults.push({
-                path: d.path?.text || "?",
-                lineNumber: d.line_number || 0,
-                lineContent: (d.lines?.text || "").trim().slice(0, 200),
-              });
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            if (newResults.length >= MAX_RESULTS) break;
+
+            try {
+              const json = JSON.parse(line);
+              if (json.type === "match" && json.data) {
+                const d = json.data;
+                newResults.push({
+                  path: d.path?.text || "?",
+                  lineNumber: d.line_number || 0,
+                  lineContent: (d.lines?.text || "").trim().slice(0, 200),
+                });
+              }
+            } catch {
+              // skip non-JSON lines
             }
-          } catch {
-            // skip non-JSON lines
           }
         }
-      }
 
-      setResults(newResults);
+        setResults(newResults);
+        rgChildRef.current = null;
+      });
 
-      if (output.stderr && output.code !== 0) {
-        setError(output.stderr);
-      }
+      command.stdout.on("data", (data) => {
+        if (searchIdRef.current === currentSearchId) {
+          stdout += data;
+        }
+      });
+
+      command.stderr.on("data", (data) => {
+        if (searchIdRef.current === currentSearchId && data) {
+          setError(data);
+        }
+      });
+
+      rgChildRef.current = await command.spawn();
     } catch (err) {
       throw err;
     }
