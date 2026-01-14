@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Command, Child } from "@tauri-apps/plugin-shell";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { open } from "@tauri-apps/plugin-dialog";
 import { Virtuoso } from "react-virtuoso";
 
 interface SearchResult {
@@ -216,9 +217,20 @@ function App() {
             type="text"
             value={searchPath}
             onChange={(e) => setSearchPath(e.target.value)}
-            placeholder="/Users/xhome/VBProjects"
-            className="w-80 px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 outline-none text-sm placeholder:text-gray-500 placeholder:italic"
+            placeholder="/path/to/folder"
+            className="w-64 px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 outline-none text-sm placeholder:text-gray-500 placeholder:italic"
           />
+          <button
+            onClick={async () => {
+              const selected = await open({ directory: true, multiple: false });
+              if (selected) {
+                setSearchPath(selected as string);
+              }
+            }}
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded border border-gray-600 text-sm transition-colors"
+          >
+            Browse
+          </button>
         </div>
 
         <div className="flex gap-4 mt-2 text-xs">

@@ -47,6 +47,7 @@
           "args": true
         }
       ]
-    }
+    },
+    "dialog:default"
   ]
 }
