@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Command } from "@tauri-apps/plugin-shell";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { Virtuoso } from "react-virtuoso";
 
 interface SearchResult {
   path: string;
@@ -13,8 +14,8 @@ interface FileResult {
   filename: string;
 }
 
-const MAX_RESULTS = 1000;
-const MAX_FILE_RESULTS = 100;
+const MAX_RESULTS = 50000;
+const MAX_FILE_RESULTS = 5000;
 
 function App() {
   const [query, setQuery] = useState("");
@@ -23,6 +24,8 @@ function App() {
   const [fileResults, setFileResults] = useState<FileResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [activeTab, setActiveTab] = useState<"files" | "content">("content");
 
   const searchIdRef = useRef(0);
 
@@ -141,8 +144,6 @@ function App() {
     }
   }
 
-  const totalResults = fileResults.length + results.length;
-
   return (
     <main className="flex flex-col h-screen bg-gray-900 text-white">
       <div className="p-4 border-b border-gray-800">
@@ -168,26 +169,51 @@ function App() {
 
         <div className="flex gap-4 mt-2 text-xs">
           {loading && <span className="text-blue-400">Searching...</span>}
-          {totalResults > 0 && (
-            <span className="text-green-400">
-              {fileResults.length} files, {results.length} content matches
-            </span>
-          )}
           {error && <span className="text-red-400">{error}</span>}
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-2 font-mono text-xs">
-        {/* Filename Matches Section */}
-        {fileResults.length > 0 && (
-          <div className="mb-4">
-            <div className="text-gray-400 px-2 py-1 mb-1 text-xs uppercase tracking-wide flex items-center gap-2">
-              <span>📁</span>
-              <span>Filename Matches ({fileResults.length})</span>
-            </div>
-            {fileResults.map((r, i) => (
+      {/* Tab Bar */}
+      <div className="flex border-b border-gray-700 bg-gray-850">
+        <button
+          onClick={() => setActiveTab("files")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === "files"
+            ? "text-white border-b-2 border-blue-500 bg-gray-800"
+            : "text-gray-400 hover:text-gray-200 hover:bg-gray-800"
+            }`}
+        >
+          📁 Filename
+          {fileResults.length > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-purple-600 text-white">
+              {fileResults.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("content")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === "content"
+            ? "text-white border-b-2 border-blue-500 bg-gray-800"
+            : "text-gray-400 hover:text-gray-200 hover:bg-gray-800"
+            }`}
+        >
+          📄 Pure Text
+          {results.length > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white">
+              {results.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Results Area */}
+      <div className="flex-1 overflow-hidden p-2 font-mono text-xs">
+        {/* File Results */}
+        {activeTab === "files" && fileResults.length > 0 && (
+          <Virtuoso
+            style={{ height: "100%" }}
+            data={fileResults}
+            itemContent={(_index, r) => (
               <div
-                key={`file-${i}`}
                 onClick={() => openPath(r.path)}
                 title={r.path}
                 className="flex gap-2 hover:bg-gray-800 px-2 py-1 rounded cursor-pointer active:bg-gray-700"
@@ -199,20 +225,21 @@ function App() {
                   {r.path}
                 </span>
               </div>
-            ))}
-          </div>
+            )}
+          />
         )}
 
-        {/* Content Matches Section */}
-        {results.length > 0 && (
-          <div>
-            <div className="text-gray-400 px-2 py-1 mb-1 text-xs uppercase tracking-wide flex items-center gap-2">
-              <span>📄</span>
-              <span>Content Matches ({results.length})</span>
-            </div>
-            {results.map((r, i) => (
+        {activeTab === "files" && fileResults.length === 0 && !loading && query.length >= 2 && searchPath && (
+          <p className="text-gray-500 p-4">No filename matches</p>
+        )}
+
+        {/* Content Results */}
+        {activeTab === "content" && results.length > 0 && (
+          <Virtuoso
+            style={{ height: "100%" }}
+            data={results}
+            itemContent={(_index, r) => (
               <div
-                key={`content-${i}`}
                 onClick={() => openPath(r.path)}
                 title={r.path}
                 className="flex gap-2 hover:bg-gray-800 px-2 py-1 rounded cursor-pointer active:bg-gray-700"
@@ -225,12 +252,12 @@ function App() {
                 </span>
                 <span className="text-gray-300 truncate">{r.lineContent}</span>
               </div>
-            ))}
-          </div>
+            )}
+          />
         )}
 
-        {!loading && totalResults === 0 && query.length >= 2 && searchPath && (
-          <p className="text-gray-500 p-4">No results</p>
+        {activeTab === "content" && results.length === 0 && !loading && query.length >= 2 && searchPath && (
+          <p className="text-gray-500 p-4">No content matches</p>
         )}
 
         {!searchPath && (
