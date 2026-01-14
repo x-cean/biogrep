@@ -17,7 +17,7 @@
 - [ ] **`~` expansion** - Support `~/Documents` style paths (needs path plugin)
 - [ ] **File preview panel** - Show file content in-app instead of opening external app
 - [ ] **Folder browser** - Navigate folder tree when user doesn't know what to search
-- [ ] **Filename search (fd)** - Add `fd` sidecar for searching by filename, not just content
+- [x] **Filename search (fd)** - Add `fd` sidecar for searching by filename, not just content
 - [ ] **Recent searches** - History of past queries
 - [x] **Virtualized list** - Use `react-virtuoso` for 50k+ results performance
 
