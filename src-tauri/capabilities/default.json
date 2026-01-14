@@ -25,6 +25,11 @@
           "name": "binaries/rg",
           "sidecar": true,
           "args": true
+        },
+        {
+          "name": "binaries/fd",
+          "sidecar": true,
+          "args": true
         }
       ]
     },
@@ -33,6 +38,11 @@
       "allow": [
         {
           "name": "binaries/rg",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/fd",
           "sidecar": true,
           "args": true
         }

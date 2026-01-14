@@ -8,12 +8,19 @@ interface SearchResult {
   lineContent: string;
 }
 
+interface FileResult {
+  path: string;
+  filename: string;
+}
+
 const MAX_RESULTS = 1000;
+const MAX_FILE_RESULTS = 100;
 
 function App() {
   const [query, setQuery] = useState("");
   const [searchPath, setSearchPath] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [fileResults, setFileResults] = useState<FileResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -23,6 +30,7 @@ function App() {
   useEffect(() => {
     if (!query.trim() || query.length < 2 || !searchPath.trim()) {
       setResults([]);
+      setFileResults([]);
       setError("");
       return;
     }
@@ -37,20 +45,66 @@ function App() {
     setLoading(true);
     setError("");
     setResults([]);
+    setFileResults([]);
 
+    try {
+      // Run both searches in parallel
+      await Promise.all([
+        runFileSearch(currentSearchId),
+        runContentSearch(currentSearchId),
+      ]);
+    } catch (err) {
+      if (searchIdRef.current === currentSearchId) {
+        setError(String(err));
+      }
+    } finally {
+      if (searchIdRef.current === currentSearchId) {
+        setLoading(false);
+      }
+    }
+  }
+
+  async function runFileSearch(currentSearchId: number) {
+    try {
+      const command = Command.sidecar("binaries/fd", [
+        query,
+        searchPath,
+        "--max-results",
+        String(MAX_FILE_RESULTS),
+      ]);
+      const output = await command.execute();
+
+      if (searchIdRef.current !== currentSearchId) return;
+
+      if (output.stdout) {
+        const lines = output.stdout.split("\n").filter((line) => line.trim());
+        const newFileResults: FileResult[] = lines.map((path) => ({
+          path: path.trim(),
+          filename: path.split("/").pop() || path,
+        }));
+        setFileResults(newFileResults);
+      }
+
+      if (output.stderr && output.code !== 0) {
+        console.error("fd error:", output.stderr);
+      }
+    } catch (err) {
+      console.error("fd search failed:", err);
+    }
+  }
+
+  async function runContentSearch(currentSearchId: number) {
     try {
       const command = Command.sidecar("binaries/rg", [
         "--json",
-        "--max-count", "50",
+        "--max-count",
+        "50",
         query,
         searchPath,
       ]);
       const output = await command.execute();
 
-      // Check if this search is still current (user may have typed again)
-      if (searchIdRef.current !== currentSearchId) {
-        return;
-      }
+      if (searchIdRef.current !== currentSearchId) return;
 
       const newResults: SearchResult[] = [];
 
@@ -83,13 +137,11 @@ function App() {
         setError(output.stderr);
       }
     } catch (err) {
-      setError(String(err));
-    } finally {
-      if (searchIdRef.current === currentSearchId) {
-        setLoading(false);
-      }
+      throw err;
     }
   }
+
+  const totalResults = fileResults.length + results.length;
 
   return (
     <main className="flex flex-col h-screen bg-gray-900 text-white">
@@ -101,7 +153,7 @@ function App() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search content (min 2 chars)..."
+            placeholder="Search files & content (min 2 chars)..."
             className="flex-1 px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 outline-none text-sm placeholder:text-gray-500 placeholder:italic"
             autoFocus
           />
@@ -116,9 +168,9 @@ function App() {
 
         <div className="flex gap-4 mt-2 text-xs">
           {loading && <span className="text-blue-400">Searching...</span>}
-          {results.length > 0 && (
+          {totalResults > 0 && (
             <span className="text-green-400">
-              {results.length >= MAX_RESULTS ? `${MAX_RESULTS}+ results` : `${results.length} results`}
+              {fileResults.length} files, {results.length} content matches
             </span>
           )}
           {error && <span className="text-red-400">{error}</span>}
@@ -126,30 +178,69 @@ function App() {
       </div>
 
       <div className="flex-1 overflow-auto p-2 font-mono text-xs">
-        {results.map((r, i) => (
-          <div
-            key={i}
-            onClick={() => openPath(r.path)}
-            title={r.path}
-            className="flex gap-2 hover:bg-gray-800 px-2 py-1 rounded cursor-pointer active:bg-gray-700"
-          >
-            <span className="text-blue-400 truncate w-40 shrink-0 hover:underline">
-              {r.path.split("/").pop()}
-            </span>
-            <span className="text-yellow-500 shrink-0 w-10 text-right">
-              {r.lineNumber}
-            </span>
-            <span className="text-gray-300 truncate">{r.lineContent}</span>
+        {/* Filename Matches Section */}
+        {fileResults.length > 0 && (
+          <div className="mb-4">
+            <div className="text-gray-400 px-2 py-1 mb-1 text-xs uppercase tracking-wide flex items-center gap-2">
+              <span>📁</span>
+              <span>Filename Matches ({fileResults.length})</span>
+            </div>
+            {fileResults.map((r, i) => (
+              <div
+                key={`file-${i}`}
+                onClick={() => openPath(r.path)}
+                title={r.path}
+                className="flex gap-2 hover:bg-gray-800 px-2 py-1 rounded cursor-pointer active:bg-gray-700"
+              >
+                <span className="text-purple-400 truncate hover:underline">
+                  {r.filename}
+                </span>
+                <span className="text-gray-500 truncate text-[10px]">
+                  {r.path}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
 
-        {!loading && results.length === 0 && query.length >= 2 && searchPath && (
+        {/* Content Matches Section */}
+        {results.length > 0 && (
+          <div>
+            <div className="text-gray-400 px-2 py-1 mb-1 text-xs uppercase tracking-wide flex items-center gap-2">
+              <span>📄</span>
+              <span>Content Matches ({results.length})</span>
+            </div>
+            {results.map((r, i) => (
+              <div
+                key={`content-${i}`}
+                onClick={() => openPath(r.path)}
+                title={r.path}
+                className="flex gap-2 hover:bg-gray-800 px-2 py-1 rounded cursor-pointer active:bg-gray-700"
+              >
+                <span className="text-blue-400 truncate w-40 shrink-0 hover:underline">
+                  {r.path.split("/").pop()}
+                </span>
+                <span className="text-yellow-500 shrink-0 w-10 text-right">
+                  {r.lineNumber}
+                </span>
+                <span className="text-gray-300 truncate">{r.lineContent}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && totalResults === 0 && query.length >= 2 && searchPath && (
           <p className="text-gray-500 p-4">No results</p>
         )}
 
         {!searchPath && (
           <p className="text-gray-500 p-4">
-            Enter a path like <code className="bg-gray-800 px-1 rounded">/Users/xhome/VBProjects</code> and search for <code className="bg-gray-800 px-1 rounded">import</code>
+            Enter a path like{" "}
+            <code className="bg-gray-800 px-1 rounded">
+              /Users/xhome/VBProjects
+            </code>{" "}
+            and search for{" "}
+            <code className="bg-gray-800 px-1 rounded">import</code>
           </p>
         )}
       </div>
