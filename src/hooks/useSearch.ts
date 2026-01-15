@@ -47,180 +47,205 @@ export function useSearch() {
     }, []);
 
     const runFileSearch = useCallback(
-        async (currentSearchId: number, q: string, path: string) => {
-            try {
-                const command = Command.sidecar("binaries/fd", [
-                    q,
-                    path,
-                    "--max-results",
-                    String(MAX_FILE_RESULTS),
-                ]);
+        (currentSearchId: number, q: string, path: string): Promise<void> => {
+            return new Promise((resolve) => {
+                try {
+                    const command = Command.sidecar("binaries/fd", [
+                        q,
+                        path,
+                        "--max-results",
+                        String(MAX_FILE_RESULTS),
+                    ]);
 
-                let stdout = "";
+                    let stdout = "";
 
-                command.on("close", () => {
-                    if (searchIdRef.current !== currentSearchId) return;
+                    command.on("close", () => {
+                        if (searchIdRef.current === currentSearchId && stdout) {
+                            const lines = stdout.split("\n").filter((line) => line.trim());
+                            const newFileResults: FileResult[] = lines
+                                .slice(0, MAX_FILE_RESULTS)
+                                .map((p) => ({
+                                    path: p.trim(),
+                                    filename: p.split("/").pop() || p,
+                                }));
+                            setFileResults(newFileResults);
+                        }
+                        fdChildRef.current = null;
+                        resolve();
+                    });
 
-                    if (stdout) {
-                        const lines = stdout.split("\n").filter((line) => line.trim());
-                        const newFileResults: FileResult[] = lines
-                            .slice(0, MAX_FILE_RESULTS)
-                            .map((p) => ({
-                                path: p.trim(),
-                                filename: p.split("/").pop() || p,
-                            }));
-                        setFileResults(newFileResults);
-                    }
-                    fdChildRef.current = null;
-                });
+                    command.stdout.on("data", (data) => {
+                        if (searchIdRef.current === currentSearchId) {
+                            stdout += data;
+                        }
+                    });
 
-                command.stdout.on("data", (data) => {
-                    if (searchIdRef.current === currentSearchId) {
-                        stdout += data;
-                    }
-                });
+                    command.stderr.on("data", (data) => {
+                        console.error("fd stderr:", data);
+                    });
 
-                command.stderr.on("data", (data) => {
-                    console.error("fd stderr:", data);
-                });
-
-                fdChildRef.current = await command.spawn();
-            } catch (err) {
-                console.error("fd search failed:", err);
-            }
+                    command.spawn().then((child) => {
+                        fdChildRef.current = child;
+                    }).catch((err) => {
+                        console.error("fd spawn failed:", err);
+                        resolve();
+                    });
+                } catch (err) {
+                    console.error("fd search failed:", err);
+                    resolve();
+                }
+            });
         },
         []
     );
 
     const runContentSearch = useCallback(
-        async (currentSearchId: number, q: string, path: string) => {
-            try {
-                const command = Command.sidecar("binaries/rg", [
-                    "--json",
-                    "--max-count",
-                    "50",
-                    q,
-                    path,
-                ]);
+        (currentSearchId: number, q: string, path: string): Promise<void> => {
+            return new Promise((resolve) => {
+                try {
+                    const command = Command.sidecar("binaries/rg", [
+                        "--json",
+                        "--max-count",
+                        "50",
+                        q,
+                        path,
+                    ]);
 
-                let stdout = "";
+                    let stdout = "";
 
-                command.on("close", () => {
-                    if (searchIdRef.current !== currentSearchId) return;
+                    command.on("close", () => {
+                        if (searchIdRef.current === currentSearchId) {
+                            const newResults: SearchResult[] = [];
 
-                    const newResults: SearchResult[] = [];
+                            if (stdout) {
+                                const lines = stdout.split("\n");
 
-                    if (stdout) {
-                        const lines = stdout.split("\n");
+                                for (const line of lines) {
+                                    if (!line.trim()) continue;
+                                    if (newResults.length >= MAX_RESULTS) break;
 
-                        for (const line of lines) {
-                            if (!line.trim()) continue;
-                            if (newResults.length >= MAX_RESULTS) break;
-
-                            try {
-                                const json = JSON.parse(line);
-                                if (json.type === "match" && json.data) {
-                                    const d = json.data;
-                                    newResults.push({
-                                        path: d.path?.text || "?",
-                                        lineNumber: d.line_number || 0,
-                                        lineContent: (d.lines?.text || "").trim().slice(0, 200),
-                                    });
+                                    try {
+                                        const json = JSON.parse(line);
+                                        if (json.type === "match" && json.data) {
+                                            const d = json.data;
+                                            newResults.push({
+                                                path: d.path?.text || "?",
+                                                lineNumber: d.line_number || 0,
+                                                lineContent: (d.lines?.text || "").trim().slice(0, 200),
+                                            });
+                                        }
+                                    } catch {
+                                        // skip non-JSON lines
+                                    }
                                 }
-                            } catch {
-                                // skip non-JSON lines
                             }
+
+                            setResults(newResults);
                         }
-                    }
+                        rgChildRef.current = null;
+                        resolve();
+                    });
 
-                    setResults(newResults);
-                    rgChildRef.current = null;
-                });
+                    command.stdout.on("data", (data) => {
+                        if (searchIdRef.current === currentSearchId) {
+                            stdout += data;
+                        }
+                    });
 
-                command.stdout.on("data", (data) => {
-                    if (searchIdRef.current === currentSearchId) {
-                        stdout += data;
-                    }
-                });
+                    command.stderr.on("data", (data) => {
+                        if (searchIdRef.current === currentSearchId && data) {
+                            setError(data);
+                        }
+                    });
 
-                command.stderr.on("data", (data) => {
-                    if (searchIdRef.current === currentSearchId && data) {
-                        setError(data);
-                    }
-                });
-
-                rgChildRef.current = await command.spawn();
-            } catch (err) {
-                throw err;
-            }
+                    command.spawn().then((child) => {
+                        rgChildRef.current = child;
+                    }).catch((err) => {
+                        console.error("rg spawn failed:", err);
+                        resolve();
+                    });
+                } catch (err) {
+                    console.error("rg search failed:", err);
+                    resolve();
+                }
+            });
         },
         []
     );
 
     const runDocSearch = useCallback(
-        async (currentSearchId: number, q: string, path: string) => {
-            try {
-                // Pass PATH so rga can find adapter binaries like pdftotext and pandoc
-                const command = Command.sidecar("binaries/rga", [
-                    "--json",
-                    "--max-count",
-                    "50",
-                    q,
-                    path,
-                ], {
-                    env: {
-                        PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-                    }
-                });
-
-                let stdout = "";
-
-                command.on("close", () => {
-                    if (searchIdRef.current !== currentSearchId) return;
-
-                    const newDocResults: DocResult[] = [];
-
-                    if (stdout) {
-                        const lines = stdout.split("\n");
-
-                        for (const line of lines) {
-                            if (!line.trim()) continue;
-                            if (newDocResults.length >= MAX_RESULTS) break;
-
-                            try {
-                                const json = JSON.parse(line);
-                                if (json.type === "match" && json.data) {
-                                    const d = json.data;
-                                    newDocResults.push({
-                                        path: d.path?.text || "?",
-                                        lineNumber: d.line_number || 0,
-                                        lineContent: (d.lines?.text || "").trim().slice(0, 200),
-                                    });
-                                }
-                            } catch {
-                                // skip non-JSON lines
-                            }
+        (currentSearchId: number, q: string, path: string): Promise<void> => {
+            return new Promise((resolve) => {
+                try {
+                    // Pass PATH so rga can find adapter binaries like pdftotext and pandoc
+                    const command = Command.sidecar("binaries/rga", [
+                        "--json",
+                        "--max-count",
+                        "50",
+                        q,
+                        path,
+                    ], {
+                        env: {
+                            PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
                         }
-                    }
+                    });
 
-                    setDocResults(newDocResults);
-                    rgaChildRef.current = null;
-                });
+                    let stdout = "";
 
-                command.stdout.on("data", (data) => {
-                    if (searchIdRef.current === currentSearchId) {
-                        stdout += data;
-                    }
-                });
+                    command.on("close", () => {
+                        if (searchIdRef.current === currentSearchId) {
+                            const newDocResults: DocResult[] = [];
 
-                command.stderr.on("data", (data) => {
-                    console.error("rga stderr:", data);
-                });
+                            if (stdout) {
+                                const lines = stdout.split("\n");
 
-                rgaChildRef.current = await command.spawn();
-            } catch (err) {
-                console.error("rga search failed:", err);
-            }
+                                for (const line of lines) {
+                                    if (!line.trim()) continue;
+                                    if (newDocResults.length >= MAX_RESULTS) break;
+
+                                    try {
+                                        const json = JSON.parse(line);
+                                        if (json.type === "match" && json.data) {
+                                            const d = json.data;
+                                            newDocResults.push({
+                                                path: d.path?.text || "?",
+                                                lineNumber: d.line_number || 0,
+                                                lineContent: (d.lines?.text || "").trim().slice(0, 200),
+                                            });
+                                        }
+                                    } catch {
+                                        // skip non-JSON lines
+                                    }
+                                }
+                            }
+
+                            setDocResults(newDocResults);
+                        }
+                        rgaChildRef.current = null;
+                        resolve();
+                    });
+
+                    command.stdout.on("data", (data) => {
+                        if (searchIdRef.current === currentSearchId) {
+                            stdout += data;
+                        }
+                    });
+
+                    command.stderr.on("data", (data) => {
+                        console.error("rga stderr:", data);
+                    });
+
+                    command.spawn().then((child) => {
+                        rgaChildRef.current = child;
+                    }).catch((err) => {
+                        console.error("rga spawn failed:", err);
+                        resolve();
+                    });
+                } catch (err) {
+                    console.error("rga search failed:", err);
+                    resolve();
+                }
+            });
         },
         []
     );

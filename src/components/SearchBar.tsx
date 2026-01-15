@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 
 interface SearchBarProps {
@@ -17,6 +18,20 @@ export function SearchBar({
     loading,
     error,
 }: SearchBarProps) {
+    const [dots, setDots] = useState("");
+
+    // Animate dots while loading
+    useEffect(() => {
+        if (!loading) {
+            setDots("");
+            return;
+        }
+        const interval = setInterval(() => {
+            setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+        }, 400);
+        return () => clearInterval(interval);
+    }, [loading]);
+
     const handleBrowse = async () => {
         const selected = await open({ directory: true, multiple: false });
         if (selected) {
@@ -53,9 +68,14 @@ export function SearchBar({
             </div>
 
             <div className="flex gap-4 mt-2 text-xs">
-                {loading && <span className="text-blue-400">Searching...</span>}
+                {loading && (
+                    <span className="text-blue-400">
+                        Searching<span className="inline-block w-4">{dots}</span>
+                    </span>
+                )}
                 {error && <span className="text-red-400">{error}</span>}
             </div>
         </div>
     );
 }
+
