@@ -5,6 +5,7 @@ interface TabBarProps {
     setActiveTab: (tab: TabType) => void;
     fileCount: number;
     contentCount: number;
+    docCount: number;
 }
 
 export function TabBar({
@@ -12,6 +13,7 @@ export function TabBar({
     setActiveTab,
     fileCount,
     contentCount,
+    docCount,
 }: TabBarProps) {
     const tabClass = (tab: TabType) =>
         `px-4 py-2 text-sm font-medium transition-colors ${activeTab === tab
@@ -34,6 +36,14 @@ export function TabBar({
                 {contentCount > 0 && (
                     <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white">
                         {contentCount}
+                    </span>
+                )}
+            </button>
+            <button onClick={() => setActiveTab("docs")} className={tabClass("docs")}>
+                📚 Documents
+                {docCount > 0 && (
+                    <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-green-600 text-white">
+                        {docCount}
                     </span>
                 )}
             </button>

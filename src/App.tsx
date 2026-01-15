@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useSearch } from "./hooks/useSearch";
 import { SearchBar } from "./components/SearchBar";
 import { TabBar } from "./components/TabBar";
-import { FileResultsList, ContentResultsList } from "./components/ResultsList";
+import { FileResultsList, ContentResultsList, DocResultsList } from "./components/ResultsList";
 import { TabType } from "./types";
 
 function App() {
@@ -13,6 +13,7 @@ function App() {
     setSearchPath,
     results,
     fileResults,
+    docResults,
     loading,
     error,
   } = useSearch();
@@ -35,6 +36,7 @@ function App() {
         setActiveTab={setActiveTab}
         fileCount={fileResults.length}
         contentCount={results.length}
+        docCount={docResults.length}
       />
 
       <div className="flex-1 overflow-hidden p-2 font-mono text-xs">
@@ -62,6 +64,18 @@ function App() {
             <p className="text-gray-500 p-4">No content matches</p>
           )}
 
+        {activeTab === "docs" && docResults.length > 0 && (
+          <DocResultsList data={docResults} />
+        )}
+
+        {activeTab === "docs" &&
+          docResults.length === 0 &&
+          !loading &&
+          query.length >= 2 &&
+          searchPath && (
+            <p className="text-gray-500 p-4">No document matches</p>
+          )}
+
         {!searchPath && (
           <p className="text-gray-500 p-4">
             Enter a path like{" "}
@@ -76,3 +90,4 @@ function App() {
 }
 
 export default App;
+

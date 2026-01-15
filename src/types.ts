@@ -9,4 +9,11 @@ export interface FileResult {
     filename: string;
 }
 
-export type TabType = "files" | "content";
+export interface DocResult {
+    path: string;
+    lineNumber: number;
+    lineContent: string;
+    adapter?: string; // e.g., "pdfpages", "pandoc"
+}
+
+export type TabType = "files" | "content" | "docs";

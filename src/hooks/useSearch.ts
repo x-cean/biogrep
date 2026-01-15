@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Command, Child } from "@tauri-apps/plugin-shell";
-import { SearchResult, FileResult } from "../types";
+import { SearchResult, FileResult, DocResult } from "../types";
 
 const MAX_RESULTS = 50000;
 const MAX_FILE_RESULTS = 5000;
@@ -10,12 +10,14 @@ export function useSearch() {
     const [searchPath, setSearchPath] = useState("");
     const [results, setResults] = useState<SearchResult[]>([]);
     const [fileResults, setFileResults] = useState<FileResult[]>([]);
+    const [docResults, setDocResults] = useState<DocResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
     const searchIdRef = useRef(0);
     const fdChildRef = useRef<Child | null>(null);
     const rgChildRef = useRef<Child | null>(null);
+    const rgaChildRef = useRef<Child | null>(null);
 
     const killPreviousSearches = useCallback(async () => {
         if (fdChildRef.current) {
@@ -33,6 +35,14 @@ export function useSearch() {
                 // Process may have already exited
             }
             rgChildRef.current = null;
+        }
+        if (rgaChildRef.current) {
+            try {
+                await rgaChildRef.current.kill();
+            } catch {
+                // Process may have already exited
+            }
+            rgaChildRef.current = null;
         }
     }, []);
 
@@ -147,12 +157,81 @@ export function useSearch() {
         []
     );
 
+    const runDocSearch = useCallback(
+        async (currentSearchId: number, q: string, path: string) => {
+            try {
+                // Pass PATH so rga can find adapter binaries like pdftotext and pandoc
+                const command = Command.sidecar("binaries/rga", [
+                    "--json",
+                    "--max-count",
+                    "50",
+                    q,
+                    path,
+                ], {
+                    env: {
+                        PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+                    }
+                });
+
+                let stdout = "";
+
+                command.on("close", () => {
+                    if (searchIdRef.current !== currentSearchId) return;
+
+                    const newDocResults: DocResult[] = [];
+
+                    if (stdout) {
+                        const lines = stdout.split("\n");
+
+                        for (const line of lines) {
+                            if (!line.trim()) continue;
+                            if (newDocResults.length >= MAX_RESULTS) break;
+
+                            try {
+                                const json = JSON.parse(line);
+                                if (json.type === "match" && json.data) {
+                                    const d = json.data;
+                                    newDocResults.push({
+                                        path: d.path?.text || "?",
+                                        lineNumber: d.line_number || 0,
+                                        lineContent: (d.lines?.text || "").trim().slice(0, 200),
+                                    });
+                                }
+                            } catch {
+                                // skip non-JSON lines
+                            }
+                        }
+                    }
+
+                    setDocResults(newDocResults);
+                    rgaChildRef.current = null;
+                });
+
+                command.stdout.on("data", (data) => {
+                    if (searchIdRef.current === currentSearchId) {
+                        stdout += data;
+                    }
+                });
+
+                command.stderr.on("data", (data) => {
+                    console.error("rga stderr:", data);
+                });
+
+                rgaChildRef.current = await command.spawn();
+            } catch (err) {
+                console.error("rga search failed:", err);
+            }
+        },
+        []
+    );
+
     // Debounced search effect
     useEffect(() => {
         if (!query.trim() || query.length < 2 || !searchPath.trim()) {
             killPreviousSearches();
             setResults([]);
             setFileResults([]);
+            setDocResults([]);
             setError("");
             return;
         }
@@ -166,11 +245,13 @@ export function useSearch() {
             setError("");
             setResults([]);
             setFileResults([]);
+            setDocResults([]);
 
             try {
                 await Promise.all([
                     runFileSearch(currentSearchId, query, searchPath),
                     runContentSearch(currentSearchId, query, searchPath),
+                    runDocSearch(currentSearchId, query, searchPath),
                 ]);
             } catch (err) {
                 if (searchIdRef.current === currentSearchId) {
@@ -184,7 +265,7 @@ export function useSearch() {
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [query, searchPath, killPreviousSearches, runFileSearch, runContentSearch]);
+    }, [query, searchPath, killPreviousSearches, runFileSearch, runContentSearch, runDocSearch]);
 
     return {
         query,
@@ -193,6 +274,7 @@ export function useSearch() {
         setSearchPath,
         results,
         fileResults,
+        docResults,
         loading,
         error,
     };

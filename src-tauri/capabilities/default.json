@@ -30,6 +30,11 @@
           "name": "binaries/fd",
           "sidecar": true,
           "args": true
+        },
+        {
+          "name": "binaries/rga",
+          "sidecar": true,
+          "args": true
         }
       ]
     },
@@ -43,6 +48,11 @@
         },
         {
           "name": "binaries/fd",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rga",
           "sidecar": true,
           "args": true
         }

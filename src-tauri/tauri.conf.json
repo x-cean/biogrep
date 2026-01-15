@@ -33,7 +33,9 @@
     ],
     "externalBin": [
       "binaries/rg",
-      "binaries/fd"
+      "binaries/fd",
+      "binaries/rga",
+      "binaries/rga-preproc"
     ]
   }
 }
