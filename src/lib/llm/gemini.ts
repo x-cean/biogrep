@@ -9,7 +9,7 @@ Rules:
 - Return ONLY the terms, one per line
 - No numbering, no explanations
 - Focus on: synonyms, abbreviations, related concepts
-- Consider common naming conventions (camelCase, snake_case, kebab-case)
+- Try to match the style of the query
 
 Query: "{query}"
 
