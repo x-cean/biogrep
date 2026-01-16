@@ -15,6 +15,9 @@ function App() {
     fileResults,
     docResults,
     loading,
+    isExpanding,
+    expandedTerms,
+    noInitialMatch,
     error,
   } = useSearch();
 
@@ -28,6 +31,9 @@ function App() {
         searchPath={searchPath}
         setSearchPath={setSearchPath}
         loading={loading}
+        isExpanding={isExpanding}
+        expandedTerms={expandedTerms}
+        noInitialMatch={noInitialMatch}
         error={error}
       />
 

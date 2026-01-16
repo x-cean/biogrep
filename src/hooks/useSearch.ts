@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Command, Child } from "@tauri-apps/plugin-shell";
 import { SearchResult, FileResult, DocResult } from "../types";
+import { getDefaultProvider } from "../lib/llm";
 
 const MAX_RESULTS = 50000;
 const MAX_FILE_RESULTS = 5000;
+const SPARSE_RESULTS_THRESHOLD = 5;
 
 export function useSearch() {
     const [query, setQuery] = useState("");
@@ -12,6 +14,9 @@ export function useSearch() {
     const [fileResults, setFileResults] = useState<FileResult[]>([]);
     const [docResults, setDocResults] = useState<DocResult[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isExpanding, setIsExpanding] = useState(false);
+    const [expandedTerms, setExpandedTerms] = useState<string[]>([]);
+    const [noInitialMatch, setNoInitialMatch] = useState(false);
     const [error, setError] = useState("");
 
     const searchIdRef = useRef(0);
@@ -271,13 +276,77 @@ export function useSearch() {
             setResults([]);
             setFileResults([]);
             setDocResults([]);
+            setExpandedTerms([]);
+            setIsExpanding(false);
+            setNoInitialMatch(false);
 
             try {
+                // Run initial search
                 await Promise.all([
                     runFileSearch(currentSearchId, query, searchPath),
                     runContentSearch(currentSearchId, query, searchPath),
                     runDocSearch(currentSearchId, query, searchPath),
                 ]);
+
+                // Check if we should expand (after initial search completes)
+                if (searchIdRef.current === currentSearchId) {
+                    // Get current result counts from state via refs or check state
+                    // We need to use a callback pattern to get latest state
+                    setResults(currentResults => {
+                        setFileResults(currentFileResults => {
+                            setDocResults(currentDocResults => {
+                                const totalResults = currentResults.length + currentFileResults.length + currentDocResults.length;
+                                console.log("[Search] Total results:", totalResults, "Threshold:", SPARSE_RESULTS_THRESHOLD);
+
+                                if (totalResults < SPARSE_RESULTS_THRESHOLD && totalResults >= 0) {
+                                    console.log("[Search] Sparse results, triggering expansion...");
+                                    setNoInitialMatch(true);
+                                    // Trigger expansion in a separate async context
+                                    (async () => {
+                                        if (searchIdRef.current !== currentSearchId) return;
+
+                                        const provider = getDefaultProvider();
+                                        if (!provider.isConfigured()) {
+                                            console.log("[Search] Provider not configured, skipping expansion");
+                                            return;
+                                        }
+
+                                        setIsExpanding(true);
+                                        try {
+                                            const terms = await provider.expandQuery(query);
+                                            if (searchIdRef.current !== currentSearchId || terms.length === 0) {
+                                                setIsExpanding(false);
+                                                return;
+                                            }
+
+                                            setExpandedTerms(terms);
+
+                                            // Run searches for expanded terms
+                                            for (const term of terms) {
+                                                if (searchIdRef.current !== currentSearchId) break;
+
+                                                await Promise.all([
+                                                    runFileSearch(currentSearchId, term, searchPath),
+                                                    runContentSearch(currentSearchId, term, searchPath),
+                                                    runDocSearch(currentSearchId, term, searchPath),
+                                                ]);
+                                            }
+                                        } catch (err) {
+                                            console.error("Query expansion failed:", err);
+                                        } finally {
+                                            if (searchIdRef.current === currentSearchId) {
+                                                setIsExpanding(false);
+                                            }
+                                        }
+                                    })();
+                                }
+                                return currentDocResults;
+                            });
+                            return currentFileResults;
+                        });
+                        return currentResults;
+                    });
+                }
             } catch (err) {
                 if (searchIdRef.current === currentSearchId) {
                     setError(String(err));
@@ -301,6 +370,9 @@ export function useSearch() {
         fileResults,
         docResults,
         loading,
+        isExpanding,
+        expandedTerms,
+        noInitialMatch,
         error,
     };
 }

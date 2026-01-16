@@ -7,6 +7,9 @@ interface SearchBarProps {
     searchPath: string;
     setSearchPath: (p: string) => void;
     loading: boolean;
+    isExpanding: boolean;
+    expandedTerms: string[];
+    noInitialMatch: boolean;
     error: string;
 }
 
@@ -16,13 +19,16 @@ export function SearchBar({
     searchPath,
     setSearchPath,
     loading,
+    isExpanding,
+    expandedTerms,
+    noInitialMatch,
     error,
 }: SearchBarProps) {
     const [dots, setDots] = useState("");
 
-    // Animate dots while loading
+    // Animate dots while loading or expanding
     useEffect(() => {
-        if (!loading) {
+        if (!loading && !isExpanding) {
             setDots("");
             return;
         }
@@ -30,7 +36,7 @@ export function SearchBar({
             setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
         }, 400);
         return () => clearInterval(interval);
-    }, [loading]);
+    }, [loading, isExpanding]);
 
     const handleBrowse = async () => {
         const selected = await open({ directory: true, multiple: false });
@@ -67,11 +73,36 @@ export function SearchBar({
                 </button>
             </div>
 
-            <div className="flex gap-4 mt-2 text-xs">
-                {loading && (
+            <div className="flex flex-col gap-1 mt-2 text-xs">
+                {loading && !isExpanding && (
                     <span className="text-blue-400">
                         Searching<span className="inline-block w-4">{dots}</span>
                     </span>
+                )}
+                {noInitialMatch && !isExpanding && !loading && expandedTerms.length === 0 && (
+                    <span className="text-yellow-400">
+                        Found no match for "{query}"
+                    </span>
+                )}
+                {noInitialMatch && isExpanding && (
+                    <>
+                        <span className="text-yellow-400">
+                            Found no match for "{query}"
+                        </span>
+                        <span className="text-purple-400">
+                            Searching {expandedTerms.join(", ")}<span className="inline-block w-4">{dots}</span>
+                        </span>
+                    </>
+                )}
+                {noInitialMatch && !isExpanding && expandedTerms.length > 0 && (
+                    <>
+                        <span className="text-gray-500">
+                            Found no match for "{query}"
+                        </span>
+                        <span className="text-gray-400">
+                            Also searched: {expandedTerms.join(", ")}
+                        </span>
+                    </>
                 )}
                 {error && <span className="text-red-400">{error}</span>}
             </div>
