@@ -3,13 +3,13 @@ import { LLMProvider, LLMConfig } from "./types";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODEL = "gemini-2.5-flash-lite";
 
-const EXPANSION_PROMPT = `You are a code search assistant. Given a search query, generate 5 alternative search terms that might find related code.
+const EXPANSION_PROMPT = `You are a file search assistant. Given a search query, generate 5 alternative search terms that might find related files or content.
 
 Rules:
 - Return ONLY the terms, one per line
 - No numbering, no explanations
-- Focus on: synonyms, abbreviations, related concepts in programming
-- Consider common naming conventions in code (camelCase, snake_case)
+- Focus on: synonyms, abbreviations, related concepts
+- Consider common naming conventions (camelCase, snake_case, kebab-case)
 
 Query: "{query}"
 
