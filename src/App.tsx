@@ -19,6 +19,7 @@ function App() {
     expandedTerms,
     noInitialMatch,
     error,
+    stopSearch,
   } = useSearch();
 
   const [activeTab, setActiveTab] = useState<TabType>("content");
@@ -35,6 +36,7 @@ function App() {
         expandedTerms={expandedTerms}
         noInitialMatch={noInitialMatch}
         error={error}
+        stopSearch={stopSearch}
       />
 
       <TabBar

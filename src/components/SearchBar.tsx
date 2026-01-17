@@ -11,6 +11,7 @@ interface SearchBarProps {
     expandedTerms: string[];
     noInitialMatch: boolean;
     error: string;
+    stopSearch: () => void;
 }
 
 export function SearchBar({
@@ -23,6 +24,7 @@ export function SearchBar({
     expandedTerms,
     noInitialMatch,
     error,
+    stopSearch,
 }: SearchBarProps) {
     const [dots, setDots] = useState("");
 
@@ -71,6 +73,14 @@ export function SearchBar({
                 >
                     Browse
                 </button>
+                {(loading || isExpanding) && (
+                    <button
+                        onClick={stopSearch}
+                        className="px-3 py-2 bg-red-600 hover:bg-red-500 rounded border border-red-500 text-sm transition-colors"
+                    >
+                        Stop
+                    </button>
+                )}
             </div>
 
             <div className="flex flex-col gap-1 mt-2 text-xs">

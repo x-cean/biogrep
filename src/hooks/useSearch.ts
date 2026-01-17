@@ -51,8 +51,17 @@ export function useSearch() {
         }
     }, []);
 
+    const stopSearch = useCallback(async () => {
+        // Increment search ID to invalidate any pending callbacks
+        searchIdRef.current++;
+        await killPreviousSearches();
+        // Reset all loading states
+        setLoading(false);
+        setIsExpanding(false);
+    }, [killPreviousSearches]);
+
     const runFileSearch = useCallback(
-        (currentSearchId: number, q: string, path: string): Promise<void> => {
+        (currentSearchId: number, q: string, path: string, accumulate = false): Promise<void> => {
             return new Promise((resolve) => {
                 try {
                     const command = Command.sidecar("binaries/fd", [
@@ -73,7 +82,11 @@ export function useSearch() {
                                     path: p.trim(),
                                     filename: p.split("/").pop() || p,
                                 }));
-                            setFileResults(newFileResults);
+                            if (accumulate) {
+                                setFileResults(prev => [...prev, ...newFileResults].slice(0, MAX_FILE_RESULTS));
+                            } else {
+                                setFileResults(newFileResults);
+                            }
                         }
                         fdChildRef.current = null;
                         resolve();
@@ -105,7 +118,7 @@ export function useSearch() {
     );
 
     const runContentSearch = useCallback(
-        (currentSearchId: number, q: string, path: string): Promise<void> => {
+        (currentSearchId: number, q: string, path: string, accumulate = false): Promise<void> => {
             return new Promise((resolve) => {
                 try {
                     const command = Command.sidecar("binaries/rg", [
@@ -145,7 +158,11 @@ export function useSearch() {
                                 }
                             }
 
-                            setResults(newResults);
+                            if (accumulate) {
+                                setResults(prev => [...prev, ...newResults].slice(0, MAX_RESULTS));
+                            } else {
+                                setResults(newResults);
+                            }
                         }
                         rgChildRef.current = null;
                         resolve();
@@ -179,7 +196,7 @@ export function useSearch() {
     );
 
     const runDocSearch = useCallback(
-        (currentSearchId: number, q: string, path: string): Promise<void> => {
+        (currentSearchId: number, q: string, path: string, accumulate = false): Promise<void> => {
             return new Promise((resolve) => {
                 try {
                     // Pass PATH so rga can find adapter binaries like pdftotext and pandoc
@@ -224,7 +241,11 @@ export function useSearch() {
                                 }
                             }
 
-                            setDocResults(newDocResults);
+                            if (accumulate) {
+                                setDocResults(prev => [...prev, ...newDocResults].slice(0, MAX_RESULTS));
+                            } else {
+                                setDocResults(newDocResults);
+                            }
                         }
                         rgaChildRef.current = null;
                         resolve();
@@ -321,14 +342,14 @@ export function useSearch() {
 
                                             setExpandedTerms(terms);
 
-                                            // Run searches for expanded terms
+                                            // Run searches for expanded terms (accumulate results)
                                             for (const term of terms) {
                                                 if (searchIdRef.current !== currentSearchId) break;
 
                                                 await Promise.all([
-                                                    runFileSearch(currentSearchId, term, searchPath),
-                                                    runContentSearch(currentSearchId, term, searchPath),
-                                                    runDocSearch(currentSearchId, term, searchPath),
+                                                    runFileSearch(currentSearchId, term, searchPath, true),
+                                                    runContentSearch(currentSearchId, term, searchPath, true),
+                                                    runDocSearch(currentSearchId, term, searchPath, true),
                                                 ]);
                                             }
                                         } catch (err) {
@@ -374,5 +395,6 @@ export function useSearch() {
         expandedTerms,
         noInitialMatch,
         error,
+        stopSearch,
     };
 }
