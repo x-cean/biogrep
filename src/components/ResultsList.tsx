@@ -73,9 +73,11 @@ export function DocResultsList({ data }: DocResultsListProps) {
                     <span className="text-green-400 truncate w-40 shrink-0 hover:underline">
                         {r.path.split("/").pop()}
                     </span>
-                    <span className="text-yellow-500 shrink-0 w-10 text-right">
-                        {r.lineNumber}
-                    </span>
+                    {r.lineNumber > 0 && (
+                        <span className="text-yellow-500 shrink-0 w-10 text-right">
+                            {r.lineNumber}
+                        </span>
+                    )}
                     <span className="text-gray-300 truncate">{r.lineContent}</span>
                 </div>
             )}

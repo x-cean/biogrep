@@ -83,7 +83,11 @@ export function useSearch() {
                                     filename: p.split("/").pop() || p,
                                 }));
                             if (accumulate) {
-                                setFileResults(prev => [...prev, ...newFileResults].slice(0, MAX_FILE_RESULTS));
+                                setFileResults(prev => {
+                                    const seen = new Set(prev.map(r => r.path));
+                                    const unique = newFileResults.filter(r => !seen.has(r.path));
+                                    return [...prev, ...unique].slice(0, MAX_FILE_RESULTS);
+                                });
                             } else {
                                 setFileResults(newFileResults);
                             }
@@ -159,7 +163,11 @@ export function useSearch() {
                             }
 
                             if (accumulate) {
-                                setResults(prev => [...prev, ...newResults].slice(0, MAX_RESULTS));
+                                setResults(prev => {
+                                    const seen = new Set(prev.map(r => `${r.path}:${r.lineNumber}`));
+                                    const unique = newResults.filter(r => !seen.has(`${r.path}:${r.lineNumber}`));
+                                    return [...prev, ...unique].slice(0, MAX_RESULTS);
+                                });
                             } else {
                                 setResults(newResults);
                             }
@@ -242,7 +250,11 @@ export function useSearch() {
                             }
 
                             if (accumulate) {
-                                setDocResults(prev => [...prev, ...newDocResults].slice(0, MAX_RESULTS));
+                                setDocResults(prev => {
+                                    const seen = new Set(prev.map(r => `${r.path}:${r.lineNumber}:${r.lineContent}`));
+                                    const unique = newDocResults.filter(r => !seen.has(`${r.path}:${r.lineNumber}:${r.lineContent}`));
+                                    return [...prev, ...unique].slice(0, MAX_RESULTS);
+                                });
                             } else {
                                 setDocResults(newDocResults);
                             }
