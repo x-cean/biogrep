@@ -22,3 +22,7 @@
     - [ ] **File Type Detection:** Logic to detect extension (e.g., .fasta) vs content-type.
     - [ ] **Basic Previewer:** Component to display text content with search terms highlighted.
     - [ ] **Simple PDF Support:** Attempt to use a Rust crate (e.g., `pdf-extract`) for text previews before trying full `rga` integration.
+
+- [ ] **Phase 5: Polish & Edge Cases**
+    - [ ] **Test Edge Cases:** Handle empty queries, invalid paths, permission errors, very large result sets, special characters in search.
+    - [ ] **Highlight Searched Text:** Adjust results display to highlight or visually emphasize the matched search term in the result content.
