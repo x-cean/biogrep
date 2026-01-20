@@ -14,7 +14,7 @@
 
 - [ ] **Phase 3: User Interface (The React Frontend)**
     - [x] Build "Omnibar" Search Input **with 300ms Debounce**.
-    - [ ] Create `useSearch` hook that listens for Tauri events and manages loading states.
+    - [x] Create `useSearch` hook that listens for Tauri events and manages loading states.
     - [x] **Implement Virtualized List:** Use `react-virtuoso` to render only visible results (crucial for 50k+ hits).
     - [ ] Add a "Stop/Cancel" button in the UI.
 
