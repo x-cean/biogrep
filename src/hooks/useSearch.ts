@@ -3,27 +3,66 @@ import { Command, Child } from "@tauri-apps/plugin-shell";
 import { SearchResult, FileResult, DocResult } from "../types";
 import { getDefaultProvider } from "../lib/llm";
 
+/**
+ * useSearch Hook - Manages file and content search functionality
+ * 
+ * This hook orchestrates three parallel search tools:
+ * - fd: Fast filename search
+ * - rg (ripgrep): Fast text content search  
+ * - rga (ripgrep-all): Document search (PDFs, Word docs, etc.)
+ * 
+ * Flow:
+ * 1. User types query → 300ms debounce → search starts
+ * 2. All three tools run in parallel
+ * 3. If results are sparse (<5), LLM suggests alternative search terms
+ * 4. Alternative terms are searched and results are accumulated
+ */
+
+// Maximum number of results to store (prevents memory issues with huge result sets)
 const MAX_RESULTS = 50000;
 const MAX_FILE_RESULTS = 5000;
+
+// If initial search returns fewer than this many results, trigger LLM expansion
 const SPARSE_RESULTS_THRESHOLD = 5;
 
 export function useSearch() {
-    const [query, setQuery] = useState("");
-    const [searchPath, setSearchPath] = useState("");
-    const [results, setResults] = useState<SearchResult[]>([]);
-    const [fileResults, setFileResults] = useState<FileResult[]>([]);
-    const [docResults, setDocResults] = useState<DocResult[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [isExpanding, setIsExpanding] = useState(false);
-    const [expandedTerms, setExpandedTerms] = useState<string[]>([]);
-    const [noInitialMatch, setNoInitialMatch] = useState(false);
+    // ============ STATE ============
+    // User input
+    const [query, setQuery] = useState("");           // The search query text
+    const [searchPath, setSearchPath] = useState(""); // Directory to search in
+
+    // Search results (three separate arrays for the three tabs)
+    const [results, setResults] = useState<SearchResult[]>([]);      // Content matches (rg)
+    const [fileResults, setFileResults] = useState<FileResult[]>([]); // Filename matches (fd)
+    const [docResults, setDocResults] = useState<DocResult[]>([]);   // Document matches (rga)
+
+    // Loading states
+    const [loading, setLoading] = useState(false);       // True while searching
+    const [isExpanding, setIsExpanding] = useState(false); // True while LLM is generating terms
+
+    // LLM expansion
+    const [expandedTerms, setExpandedTerms] = useState<string[]>([]); // Terms suggested by LLM
+    const [noInitialMatch, setNoInitialMatch] = useState(false);      // True if original query had sparse results
+
     const [error, setError] = useState("");
 
+    // ============ REFS ============
+    // searchIdRef: Increments with each new search. Used to ignore results from stale searches.
+    // Example: User types "test", then quickly types "hello". We only want "hello" results.
     const searchIdRef = useRef(0);
-    const fdChildRef = useRef<Child | null>(null);
-    const rgChildRef = useRef<Child | null>(null);
-    const rgaChildRef = useRef<Child | null>(null);
 
+    // Process references - we keep track of spawned processes so we can kill them
+    // when a new search starts (prevents old results from polluting new searches)
+    const fdChildRef = useRef<Child | null>(null);   // fd process
+    const rgChildRef = useRef<Child | null>(null);   // rg process
+    const rgaChildRef = useRef<Child | null>(null);  // rga process
+
+    // ============ UTILITY FUNCTIONS ============
+
+    /**
+     * Kill all running search processes.
+     * Called when: new search starts, user clicks Stop, or query is cleared.
+     */
     const killPreviousSearches = useCallback(async () => {
         if (fdChildRef.current) {
             try {
@@ -51,6 +90,9 @@ export function useSearch() {
         }
     }, []);
 
+    /**
+     * User-triggered stop - kills processes AND resets loading state.
+     */
     const stopSearch = useCallback(async () => {
         // Increment search ID to invalidate any pending callbacks
         searchIdRef.current++;
@@ -60,6 +102,17 @@ export function useSearch() {
         setIsExpanding(false);
     }, [killPreviousSearches]);
 
+    // ============ SEARCH FUNCTIONS ============
+    // Each search function follows this pattern:
+    // 1. Spawn a sidecar process (fd/rg/rga)
+    // 2. Collect stdout data as it streams in
+    // 3. On close, parse results and update state
+    // 4. If accumulate=true, merge with existing results (for LLM expansion)
+    // 5. If accumulate=false, replace results (for initial search)
+
+    /**
+     * Search filenames using fd (fast find alternative).
+     */
     const runFileSearch = useCallback(
         (currentSearchId: number, q: string, path: string, accumulate = false): Promise<void> => {
             return new Promise((resolve) => {
@@ -84,6 +137,8 @@ export function useSearch() {
                                 }));
                             if (accumulate) {
                                 setFileResults(prev => {
+                                    // Double-check searchId to prevent race conditions
+                                    if (searchIdRef.current !== currentSearchId) return prev;
                                     const seen = new Set(prev.map(r => r.path));
                                     const unique = newFileResults.filter(r => !seen.has(r.path));
                                     return [...prev, ...unique].slice(0, MAX_FILE_RESULTS);
@@ -121,6 +176,10 @@ export function useSearch() {
         []
     );
 
+    /**
+     * Search file contents using rg (ripgrep).
+     * Results include: file path, line number, and matching line content.
+     */
     const runContentSearch = useCallback(
         (currentSearchId: number, q: string, path: string, accumulate = false): Promise<void> => {
             return new Promise((resolve) => {
@@ -164,6 +223,8 @@ export function useSearch() {
 
                             if (accumulate) {
                                 setResults(prev => {
+                                    // Double-check searchId to prevent race conditions
+                                    if (searchIdRef.current !== currentSearchId) return prev;
                                     const seen = new Set(prev.map(r => `${r.path}:${r.lineNumber}`));
                                     const unique = newResults.filter(r => !seen.has(`${r.path}:${r.lineNumber}`));
                                     return [...prev, ...unique].slice(0, MAX_RESULTS);
@@ -203,6 +264,10 @@ export function useSearch() {
         []
     );
 
+    /**
+     * Search documents (PDFs, Word, etc.) using rga (ripgrep-all).
+     * rga uses adapters (pdftotext, pandoc) to extract text from binary formats.
+     */
     const runDocSearch = useCallback(
         (currentSearchId: number, q: string, path: string, accumulate = false): Promise<void> => {
             return new Promise((resolve) => {
@@ -251,6 +316,8 @@ export function useSearch() {
 
                             if (accumulate) {
                                 setDocResults(prev => {
+                                    // Double-check searchId to prevent race conditions
+                                    if (searchIdRef.current !== currentSearchId) return prev;
                                     const seen = new Set(prev.map(r => `${r.path}:${r.lineNumber}:${r.lineContent}`));
                                     const unique = newDocResults.filter(r => !seen.has(`${r.path}:${r.lineNumber}:${r.lineContent}`));
                                     return [...prev, ...unique].slice(0, MAX_RESULTS);
@@ -288,8 +355,19 @@ export function useSearch() {
         []
     );
 
-    // Debounced search effect
+    // ============ MAIN SEARCH EFFECT ============
+    /**
+     * This effect runs whenever query or searchPath changes.
+     * It implements a 300ms debounce to avoid excessive searching while typing.
+     * 
+     * Flow:
+     * 1. Clear previous results
+     * 2. Start all three searches (fd, rg, rga) in parallel
+     * 3. If sparse results, trigger LLM expansion
+     * 4. Search for each LLM-suggested term and accumulate results
+     */
     useEffect(() => {
+        // Don't search if query is too short or path is empty
         if (!query.trim() || query.length < 2 || !searchPath.trim()) {
             killPreviousSearches();
             setResults([]);
@@ -299,6 +377,7 @@ export function useSearch() {
             return;
         }
 
+        // Debounce: wait 300ms after user stops typing
         const timer = setTimeout(async () => {
             await killPreviousSearches();
 
@@ -321,20 +400,24 @@ export function useSearch() {
                     runDocSearch(currentSearchId, query, searchPath),
                 ]);
 
-                // Check if we should expand (after initial search completes)
+                // ============ LLM EXPANSION CHECK ============
+                // After initial search, check if results are sparse.
+                // If so, ask the LLM for alternative search terms.
                 if (searchIdRef.current === currentSearchId) {
-                    // Get current result counts from state via refs or check state
-                    // We need to use a callback pattern to get latest state
+                    // We need nested setState to get the latest state values
+                    // (React batches updates, so we can't read state directly)
                     setResults(currentResults => {
                         setFileResults(currentFileResults => {
                             setDocResults(currentDocResults => {
                                 const totalResults = currentResults.length + currentFileResults.length + currentDocResults.length;
                                 console.log("[Search] Total results:", totalResults, "Threshold:", SPARSE_RESULTS_THRESHOLD);
 
+                                // Sparse results → trigger LLM expansion
                                 if (totalResults < SPARSE_RESULTS_THRESHOLD && totalResults >= 0) {
                                     console.log("[Search] Sparse results, triggering expansion...");
                                     setNoInitialMatch(true);
-                                    // Trigger expansion in a separate async context
+
+                                    // Run expansion in separate async context (can't await inside setState)
                                     (async () => {
                                         if (searchIdRef.current !== currentSearchId) return;
 
