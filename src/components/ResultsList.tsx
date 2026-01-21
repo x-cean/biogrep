@@ -1,12 +1,14 @@
 import { Virtuoso } from "react-virtuoso";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { SearchResult, FileResult, DocResult } from "../types";
+import { highlightText } from "../utils/highlightText";
 
 interface FileResultsListProps {
     data: FileResult[];
+    query?: string;
 }
 
-export function FileResultsList({ data }: FileResultsListProps) {
+export function FileResultsList({ data, query }: FileResultsListProps) {
     return (
         <Virtuoso
             style={{ height: "100%" }}
@@ -18,7 +20,7 @@ export function FileResultsList({ data }: FileResultsListProps) {
                     className="flex gap-2 hover:bg-gray-800 px-2 py-1 rounded cursor-pointer active:bg-gray-700"
                 >
                     <span className="text-purple-400 truncate hover:underline">
-                        {r.filename}
+                        {query ? highlightText(r.filename, query) : r.filename}
                     </span>
                     <span className="text-gray-500 truncate text-[10px]">{r.path}</span>
                 </div>
@@ -29,9 +31,10 @@ export function FileResultsList({ data }: FileResultsListProps) {
 
 interface ContentResultsListProps {
     data: SearchResult[];
+    query: string;
 }
 
-export function ContentResultsList({ data }: ContentResultsListProps) {
+export function ContentResultsList({ data, query }: ContentResultsListProps) {
     return (
         <Virtuoso
             style={{ height: "100%" }}
@@ -48,7 +51,7 @@ export function ContentResultsList({ data }: ContentResultsListProps) {
                     <span className="text-yellow-500 shrink-0 w-10 text-right">
                         {r.lineNumber}
                     </span>
-                    <span className="text-gray-300 truncate">{r.lineContent}</span>
+                    <span className="text-gray-300 truncate">{highlightText(r.lineContent, query)}</span>
                 </div>
             )}
         />
@@ -57,9 +60,10 @@ export function ContentResultsList({ data }: ContentResultsListProps) {
 
 interface DocResultsListProps {
     data: DocResult[];
+    query: string;
 }
 
-export function DocResultsList({ data }: DocResultsListProps) {
+export function DocResultsList({ data, query }: DocResultsListProps) {
     return (
         <Virtuoso
             style={{ height: "100%" }}
@@ -78,7 +82,7 @@ export function DocResultsList({ data }: DocResultsListProps) {
                             {r.lineNumber}
                         </span>
                     )}
-                    <span className="text-gray-300 truncate">{r.lineContent}</span>
+                    <span className="text-gray-300 truncate">{highlightText(r.lineContent, query)}</span>
                 </div>
             )}
         />
