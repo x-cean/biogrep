@@ -12,11 +12,11 @@
     - [x] Create `Event` struct in Rust to parse `rg --json` lines into typed objects.
     - [x] Implement `fd` integration for file-only search mode.
 
-- [ ] **Phase 3: User Interface (The React Frontend)**
+- [x] **Phase 3: User Interface (The React Frontend)**
     - [x] Build "Omnibar" Search Input **with 300ms Debounce**.
     - [x] Create `useSearch` hook that listens for Tauri events and manages loading states.
     - [x] **Implement Virtualized List:** Use `react-virtuoso` to render only visible results (crucial for 50k+ hits).
-    - [ ] Add a "Stop/Cancel" button in the UI.
+    - [x] Add a "Stop/Cancel" button in the UI.
 
 - [ ] **Phase 4: "Science" Logic (The Differentiator)**
     - [ ] **File Type Detection:** Logic to detect extension (e.g., .fasta) vs content-type.
@@ -25,4 +25,4 @@
 
 - [ ] **Phase 5: Polish & Edge Cases**
     - [ ] **Test Edge Cases:** Handle empty queries, invalid paths, permission errors, very large result sets, special characters in search.
-    - [ ] **Highlight Searched Text:** Adjust results display to highlight or visually emphasize the matched search term in the result content.
+    - [x] **Highlight Searched Text:** Adjust results display to highlight or visually emphasize the matched search term in the result content.
