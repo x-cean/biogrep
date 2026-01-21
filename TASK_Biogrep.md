@@ -26,3 +26,6 @@
 - [ ] **Phase 5: Polish & Edge Cases**
     - [ ] **Test Edge Cases:** Handle empty queries, invalid paths, permission errors, very large result sets, special characters in search.
     - [x] **Highlight Searched Text:** Adjust results display to highlight or visually emphasize the matched search term in the result content.
+    - [x] **Highlight Edge Cases:** LLM-expanded search terms now also get highlighted.
+    - [x] **Resizable Columns:** Drag the column divider to resize filename/path column width.
+
