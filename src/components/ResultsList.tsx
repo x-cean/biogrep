@@ -6,9 +6,11 @@ import { highlightText } from "../utils/highlightText";
 interface FileResultsListProps {
     data: FileResult[];
     query?: string;
+    expandedTerms?: string[];
 }
 
-export function FileResultsList({ data, query }: FileResultsListProps) {
+export function FileResultsList({ data, query, expandedTerms = [] }: FileResultsListProps) {
+    const allTerms = query ? [query, ...expandedTerms] : expandedTerms;
     return (
         <Virtuoso
             style={{ height: "100%" }}
@@ -20,7 +22,7 @@ export function FileResultsList({ data, query }: FileResultsListProps) {
                     className="flex gap-2 hover:bg-gray-800 px-2 py-1 rounded cursor-pointer active:bg-gray-700"
                 >
                     <span className="text-purple-400 truncate hover:underline">
-                        {query ? highlightText(r.filename, query) : r.filename}
+                        {allTerms.length > 0 ? highlightText(r.filename, allTerms) : r.filename}
                     </span>
                     <span className="text-gray-500 truncate text-[10px]">{r.path}</span>
                 </div>
@@ -32,9 +34,11 @@ export function FileResultsList({ data, query }: FileResultsListProps) {
 interface ContentResultsListProps {
     data: SearchResult[];
     query: string;
+    expandedTerms?: string[];
 }
 
-export function ContentResultsList({ data, query }: ContentResultsListProps) {
+export function ContentResultsList({ data, query, expandedTerms = [] }: ContentResultsListProps) {
+    const allTerms = [query, ...expandedTerms];
     return (
         <Virtuoso
             style={{ height: "100%" }}
@@ -51,7 +55,7 @@ export function ContentResultsList({ data, query }: ContentResultsListProps) {
                     <span className="text-yellow-500 shrink-0 w-10 text-right">
                         {r.lineNumber}
                     </span>
-                    <span className="text-gray-300 truncate">{highlightText(r.lineContent, query)}</span>
+                    <span className="text-gray-300 truncate">{highlightText(r.lineContent, allTerms)}</span>
                 </div>
             )}
         />
@@ -61,9 +65,11 @@ export function ContentResultsList({ data, query }: ContentResultsListProps) {
 interface DocResultsListProps {
     data: DocResult[];
     query: string;
+    expandedTerms?: string[];
 }
 
-export function DocResultsList({ data, query }: DocResultsListProps) {
+export function DocResultsList({ data, query, expandedTerms = [] }: DocResultsListProps) {
+    const allTerms = [query, ...expandedTerms];
     return (
         <Virtuoso
             style={{ height: "100%" }}
@@ -82,7 +88,7 @@ export function DocResultsList({ data, query }: DocResultsListProps) {
                             {r.lineNumber}
                         </span>
                     )}
-                    <span className="text-gray-300 truncate">{highlightText(r.lineContent, query)}</span>
+                    <span className="text-gray-300 truncate">{highlightText(r.lineContent, allTerms)}</span>
                 </div>
             )}
         />

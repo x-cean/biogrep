@@ -49,7 +49,7 @@ function App() {
 
       <div className="flex-1 overflow-hidden p-2 font-mono text-xs">
         {activeTab === "files" && fileResults.length > 0 && (
-          <FileResultsList data={fileResults} query={query} />
+          <FileResultsList data={fileResults} query={query} expandedTerms={expandedTerms} />
         )}
 
         {activeTab === "files" &&
@@ -61,7 +61,7 @@ function App() {
           )}
 
         {activeTab === "content" && results.length > 0 && (
-          <ContentResultsList data={results} query={query} />
+          <ContentResultsList data={results} query={query} expandedTerms={expandedTerms} />
         )}
 
         {activeTab === "content" &&
@@ -73,7 +73,7 @@ function App() {
           )}
 
         {activeTab === "docs" && docResults.length > 0 && (
-          <DocResultsList data={docResults} query={query} />
+          <DocResultsList data={docResults} query={query} expandedTerms={expandedTerms} />
         )}
 
         {activeTab === "docs" &&
