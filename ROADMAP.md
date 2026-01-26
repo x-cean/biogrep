@@ -76,10 +76,30 @@ Transform BioGrep from a fast file search tool into an **intelligent work assist
   - [ ] Extract key entities (methods, results, citations)
   - [ ] Answer questions about document content
 
+- [ ] **Structural Parsing (Optional Enhancements)**
+  > *Complement semantic search with structure-aware navigation*
+  
+  - [ ] **Folder Pattern Detection**
+    - [ ] Recognize project boundaries (date-based, topic-based folders)
+    - [ ] Infer folder purposes (raw_data/, analysis/, manuscripts/)
+    - [ ] Use folder context to improve search relevance
+  
+  - [ ] **File Naming Convention Parsing**
+    - [ ] Extract dates, versions, experiment IDs from filenames
+    - [ ] Detect user's naming patterns over time
+    - [ ] Group related files (e.g., `fig1_v1.png`, `fig1_v2.png`, `fig1_final.png`)
+  
+  - [ ] **Document Section Extraction**
+    - [ ] Parse scientific papers: Abstract → Methods → Results → Discussion
+    - [ ] Extract protocol steps from lab notebooks
+    - [ ] Identify headers/structure in markdown and text files
+    - [ ] Use section context for more precise answers
+
 ### Technical Considerations
 - Keep embeddings local for privacy (research data sensitivity)
 - Incremental indexing (don't re-embed unchanged files)
 - Show "understanding" progress to user
+- Structural parsing is *secondary* to semantic search — add opportunistically
 
 ---
 
