@@ -20,12 +20,12 @@ export function FileResultsList({ data, query, expandedTerms = [] }: FileResults
             data={data}
             itemContent={(_index, r) => (
                 <div
-                    onClick={() => openPath(r.path)}
                     title={r.path}
-                    className="flex hover:bg-gray-800 px-2 py-1 rounded cursor-pointer active:bg-gray-700"
+                    className="flex hover:bg-gray-800 px-2 py-1 rounded"
                 >
                     <span
-                        className="text-purple-400 truncate hover:underline shrink-0"
+                        onClick={() => openPath(r.path)}
+                        className="text-purple-400 truncate hover:underline shrink-0 cursor-pointer"
                         style={{ width: filenameWidth }}
                     >
                         {allTerms.length > 0 ? highlightText(r.filename, allTerms) : r.filename}
@@ -58,12 +58,12 @@ export function ContentResultsList({ data, query, expandedTerms = [] }: ContentR
             data={data}
             itemContent={(_index, r) => (
                 <div
-                    onClick={() => openPath(r.path)}
                     title={r.path}
-                    className="flex hover:bg-gray-800 px-2 py-1 rounded cursor-pointer active:bg-gray-700"
+                    className="flex hover:bg-gray-800 px-2 py-1 rounded"
                 >
                     <span
-                        className="text-blue-400 truncate hover:underline shrink-0"
+                        onClick={() => openPath(r.path)}
+                        className="text-blue-400 truncate hover:underline shrink-0 cursor-pointer"
                         style={{ width: pathWidth }}
                     >
                         {r.path.split("/").pop()}
@@ -99,12 +99,12 @@ export function DocResultsList({ data, query, expandedTerms = [] }: DocResultsLi
             data={data}
             itemContent={(_index, r) => (
                 <div
-                    onClick={() => openPath(r.path)}
                     title={r.path}
-                    className="flex hover:bg-gray-800 px-2 py-1 rounded cursor-pointer active:bg-gray-700"
+                    className="flex hover:bg-gray-800 px-2 py-1 rounded"
                 >
                     <span
-                        className="text-green-400 truncate hover:underline shrink-0"
+                        onClick={() => openPath(r.path)}
+                        className="text-green-400 truncate hover:underline shrink-0 cursor-pointer"
                         style={{ width: pathWidth }}
                     >
                         {r.path.split("/").pop()}
