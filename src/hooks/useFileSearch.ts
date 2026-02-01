@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { Command, Child } from "@tauri-apps/plugin-shell";
 import { FileResult } from "../types";
+import { LineBuffer, ThrottledAccumulator } from "../utils/stream";
 
 /**
  * useFileSearch Hook - Filename search using fd
@@ -42,36 +43,37 @@ export function useFileSearch({ fdChildRef, getSearchId }: UseFileSearchOptions)
                         String(MAX_FILE_RESULTS),
                     ]);
 
-                    let stdout = "";
+                    const lineBuffer = new LineBuffer();
+
+                    const accumulator = new ThrottledAccumulator<FileResult>((batch) => {
+                        if (getSearchId() === currentSearchId) {
+                            setResults((prev) => {
+                                if (prev.length >= MAX_FILE_RESULTS) return prev;
+
+                                if (accumulate) {
+                                    const seen = new Set(prev.map((r) => r.path));
+                                    const unique = batch.filter((r) => !seen.has(r.path));
+                                    return [...prev, ...unique].slice(0, MAX_FILE_RESULTS);
+                                }
+
+                                return [...prev, ...batch].slice(0, MAX_FILE_RESULTS);
+                            });
+                        }
+                    }, 50, 50);
 
                     command.on("close", () => {
-                        if (getSearchId() === currentSearchId && stdout) {
-                            const lines = stdout.split("\n").filter((line) => line.trim());
-                            const newFileResults: FileResult[] = lines
-                                .slice(0, MAX_FILE_RESULTS)
-                                .map((p) => ({
-                                    path: p.trim(),
-                                    filename: p.split("/").pop() || p,
-                                }));
+                        const remainingLines = lineBuffer.flush();
+                        processLines(remainingLines, accumulator);
+                        accumulator.flush();
 
-                            if (accumulate) {
-                                setResults((prev) => {
-                                    if (getSearchId() !== currentSearchId) return prev;
-                                    const seen = new Set(prev.map((r) => r.path));
-                                    const unique = newFileResults.filter((r) => !seen.has(r.path));
-                                    return [...prev, ...unique].slice(0, MAX_FILE_RESULTS);
-                                });
-                            } else {
-                                setResults(newFileResults);
-                            }
-                        }
                         fdChildRef.current = null;
                         resolve();
                     });
 
                     command.stdout.on("data", (data) => {
                         if (getSearchId() === currentSearchId) {
-                            stdout += data;
+                            const lines = lineBuffer.append(data);
+                            processLines(lines, accumulator);
                         }
                     });
 
@@ -98,4 +100,16 @@ export function useFileSearch({ fdChildRef, getSearchId }: UseFileSearchOptions)
     );
 
     return { runFileSearch };
+}
+
+function processLines(lines: string[], accumulator: ThrottledAccumulator<FileResult>) {
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        accumulator.add({
+            path: trimmed,
+            filename: trimmed.split("/").pop() || trimmed,
+        });
+    }
 }

@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { Command, Child } from "@tauri-apps/plugin-shell";
 import { SearchResult } from "../types";
+import { LineBuffer, ThrottledAccumulator } from "../utils/stream";
 
 /**
  * useContentSearch Hook - Text content search using ripgrep
@@ -9,7 +10,7 @@ import { SearchResult } from "../types";
  * Results include: file path, line number, and matching line content.
  */
 
-const MAX_RESULTS = 50000;
+const MAX_RESULTS = 20000; // Reduced slightly for better stream performance
 
 interface UseContentSearchOptions {
     rgChildRef: React.MutableRefObject<Child | null>;
@@ -40,66 +41,59 @@ export function useContentSearch({ rgChildRef, getSearchId }: UseContentSearchOp
                     const command = Command.sidecar("binaries/rg", [
                         "--json",
                         "--max-count",
-                        "50",
+                        "200", // Limit matches per file to avoid flooding
                         query,
                         path,
                     ]);
 
-                    let stdout = "";
+                    const lineBuffer = new LineBuffer();
 
-                    command.on("close", () => {
+                    // Throttle updates to UI (every 100ms or 50 items)
+                    const accumulator = new ThrottledAccumulator<SearchResult>((batch) => {
                         if (getSearchId() === currentSearchId) {
-                            const newResults: SearchResult[] = [];
+                            setResults((prev) => {
+                                // Safety check to stop growing if we hit limit
+                                if (prev.length >= MAX_RESULTS) return prev;
 
-                            if (stdout) {
-                                const lines = stdout.split("\n");
-
-                                for (const line of lines) {
-                                    if (!line.trim()) continue;
-                                    if (newResults.length >= MAX_RESULTS) break;
-
-                                    try {
-                                        const json = JSON.parse(line);
-                                        if (json.type === "match" && json.data) {
-                                            const d = json.data;
-                                            newResults.push({
-                                                path: d.path?.text || "?",
-                                                lineNumber: d.line_number || 0,
-                                                lineContent: (d.lines?.text || "").trim().slice(0, 200),
-                                            });
-                                        }
-                                    } catch {
-                                        // skip non-JSON lines
-                                    }
-                                }
-                            }
-
-                            if (accumulate) {
-                                setResults((prev) => {
-                                    if (getSearchId() !== currentSearchId) return prev;
+                                // When accumulating (LLM expansion), we might duplicate, so filter
+                                // But for main search stream, raw append is faster.
+                                // We'll use a simple collision check if accumulate is true
+                                if (accumulate) {
                                     const seen = new Set(prev.map((r) => `${r.path}:${r.lineNumber}`));
-                                    const unique = newResults.filter(
+                                    const unique = batch.filter(
                                         (r) => !seen.has(`${r.path}:${r.lineNumber}`)
                                     );
                                     return [...prev, ...unique].slice(0, MAX_RESULTS);
-                                });
-                            } else {
-                                setResults(newResults);
-                            }
+                                }
+
+                                return [...prev, ...batch].slice(0, MAX_RESULTS);
+                            });
                         }
+                    }, 50, 50);
+
+                    command.on("close", () => {
+                        // Flush any remaining data
+                        const remainingLines = lineBuffer.flush();
+                        processLines(remainingLines, accumulator);
+                        accumulator.flush();
+
                         rgChildRef.current = null;
                         resolve();
                     });
 
                     command.stdout.on("data", (data) => {
                         if (getSearchId() === currentSearchId) {
-                            stdout += data;
+                            const lines = lineBuffer.append(data);
+                            processLines(lines, accumulator);
                         }
                     });
 
                     command.stderr.on("data", (data) => {
                         if (getSearchId() === currentSearchId && data) {
-                            setError(data);
+                            // Only show actual errors, ignore some stats output if any
+                            if (data.includes("error")) {
+                                setError(data);
+                            }
                         }
                     });
 
@@ -122,4 +116,29 @@ export function useContentSearch({ rgChildRef, getSearchId }: UseContentSearchOp
     );
 
     return { runContentSearch };
+}
+
+function processLines(lines: string[], accumulator: ThrottledAccumulator<SearchResult>) {
+    for (const line of lines) {
+        if (!line.trim()) continue;
+
+        try {
+            const json = JSON.parse(line);
+            if (json.type === "match" && json.data) {
+                const d = json.data;
+                const path = d.path?.text || "?";
+                const lineNumber = d.line_number || 0;
+                // Truncate incredibly long lines (minified code etc)
+                const lineContent = (d.lines?.text || "").trim().slice(0, 300);
+
+                accumulator.add({
+                    path,
+                    lineNumber,
+                    lineContent,
+                });
+            }
+        } catch {
+            // skip non-JSON lines
+        }
+    }
 }

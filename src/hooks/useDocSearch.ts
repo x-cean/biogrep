@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { Command, Child } from "@tauri-apps/plugin-shell";
 import { DocResult } from "../types";
+import { LineBuffer, ThrottledAccumulator } from "../utils/stream";
 
 /**
  * useDocSearch Hook - Document search using ripgrep-all
@@ -10,7 +11,7 @@ import { DocResult } from "../types";
  * Results include: file path, line number, and matching line content.
  */
 
-const MAX_RESULTS = 50000;
+const MAX_RESULTS = 20000;
 
 // PATH for rga to find adapter binaries (pdftotext, pandoc)
 const RGA_PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin";
@@ -41,7 +42,7 @@ export function useDocSearch({ rgaChildRef, getSearchId }: UseDocSearchOptions) 
                 try {
                     const command = Command.sidecar(
                         "binaries/rga",
-                        ["--json", "--max-count", "50", query, path],
+                        ["--json", "--max-count", "200", query, path],
                         {
                             env: {
                                 PATH: RGA_PATH,
@@ -49,57 +50,41 @@ export function useDocSearch({ rgaChildRef, getSearchId }: UseDocSearchOptions) 
                         }
                     );
 
-                    let stdout = "";
+                    const lineBuffer = new LineBuffer();
 
-                    command.on("close", () => {
+                    const accumulator = new ThrottledAccumulator<DocResult>((batch) => {
                         if (getSearchId() === currentSearchId) {
-                            const newDocResults: DocResult[] = [];
+                            setResults((prev) => {
+                                if (prev.length >= MAX_RESULTS) return prev;
 
-                            if (stdout) {
-                                const lines = stdout.split("\n");
-
-                                for (const line of lines) {
-                                    if (!line.trim()) continue;
-                                    if (newDocResults.length >= MAX_RESULTS) break;
-
-                                    try {
-                                        const json = JSON.parse(line);
-                                        if (json.type === "match" && json.data) {
-                                            const d = json.data;
-                                            newDocResults.push({
-                                                path: d.path?.text || "?",
-                                                lineNumber: d.line_number || 0,
-                                                lineContent: (d.lines?.text || "").trim().slice(0, 200),
-                                            });
-                                        }
-                                    } catch {
-                                        // skip non-JSON lines
-                                    }
-                                }
-                            }
-
-                            if (accumulate) {
-                                setResults((prev) => {
-                                    if (getSearchId() !== currentSearchId) return prev;
+                                if (accumulate) {
                                     const seen = new Set(
                                         prev.map((r) => `${r.path}:${r.lineNumber}:${r.lineContent}`)
                                     );
-                                    const unique = newDocResults.filter(
+                                    const unique = batch.filter(
                                         (r) => !seen.has(`${r.path}:${r.lineNumber}:${r.lineContent}`)
                                     );
                                     return [...prev, ...unique].slice(0, MAX_RESULTS);
-                                });
-                            } else {
-                                setResults(newDocResults);
-                            }
+                                }
+
+                                return [...prev, ...batch].slice(0, MAX_RESULTS);
+                            });
                         }
+                    }, 50, 50);
+
+                    command.on("close", () => {
+                        const remainingLines = lineBuffer.flush();
+                        processLines(remainingLines, accumulator);
+                        accumulator.flush();
+
                         rgaChildRef.current = null;
                         resolve();
                     });
 
                     command.stdout.on("data", (data) => {
                         if (getSearchId() === currentSearchId) {
-                            stdout += data;
+                            const lines = lineBuffer.append(data);
+                            processLines(lines, accumulator);
                         }
                     });
 
@@ -126,4 +111,24 @@ export function useDocSearch({ rgaChildRef, getSearchId }: UseDocSearchOptions) 
     );
 
     return { runDocSearch };
+}
+
+function processLines(lines: string[], accumulator: ThrottledAccumulator<DocResult>) {
+    for (const line of lines) {
+        if (!line.trim()) continue;
+
+        try {
+            const json = JSON.parse(line);
+            if (json.type === "match" && json.data) {
+                const d = json.data;
+                accumulator.add({
+                    path: d.path?.text || "?",
+                    lineNumber: d.line_number || 0,
+                    lineContent: (d.lines?.text || "").trim().slice(0, 300),
+                });
+            }
+        } catch {
+            // skip non-JSON lines
+        }
+    }
 }
