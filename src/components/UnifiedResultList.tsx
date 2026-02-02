@@ -1,3 +1,17 @@
+/**
+ * UnifiedResultList Component - Generic virtualized result display
+ * 
+ * A reusable, generic list component that displays search results
+ * with a resizable two-column layout:
+ * - Primary column: Clickable content (filename, path) with adjustable width
+ * - Resize handle: Drag to resize the primary column
+ * - Secondary column: Additional info (full path, line content, etc.)
+ * 
+ * Uses react-virtuoso for efficient rendering of large result sets.
+ * The column resize state is managed by the useColumnResize hook.
+ * 
+ * @template T - The type of items in the list (FileResult, SearchResult, etc.)
+ */
 import { ReactNode } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { useColumnResize } from "../hooks/useColumnResize";

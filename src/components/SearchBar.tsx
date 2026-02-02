@@ -1,6 +1,32 @@
 import { useState, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 
+/**
+ * SearchBar Component - Main search input and controls
+ * 
+ * Renders the search query input, directory path input with browse button,
+ * and a stop button for cancelling in-progress searches.
+ * 
+ * Also displays status messages:
+ * - "Searching..." with animated dots during active search
+ * - LLM expansion status when query is being expanded
+ * - Error messages from search operations
+ * 
+ * @example
+ * <SearchBar
+ *   query={query}
+ *   setQuery={setQuery}
+ *   searchPath="/Users/me/code"
+ *   setSearchPath={setSearchPath}
+ *   loading={false}
+ *   isExpanding={false}
+ *   expandedTerms={[]}
+ *   noInitialMatch={false}
+ *   error=""
+ *   stopSearch={() => {}}
+ * />
+ */
+
 interface SearchBarProps {
     query: string;
     setQuery: (q: string) => void;

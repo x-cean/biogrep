@@ -6,7 +6,6 @@ import React from "react";
  * Returns a React element with matched portions wrapped in <mark> tags.
  */
 export function highlightText(text: string, queries: string | string[]): React.ReactNode {
-    // Normalize to array and filter empty/short queries
     // Normalize to array, split by commas, and filter empty/short queries
     const rawList: string[] = Array.isArray(queries) ? queries : [queries];
 

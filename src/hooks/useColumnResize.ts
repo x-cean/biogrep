@@ -1,7 +1,19 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
 /**
- * Hook to manage resizable column widths with mouse drag.
+ * useColumnResize Hook - Drag-to-resize column management
+ * 
+ * Manages the width state of a resizable column. Handles mouse events
+ * for drag-to-resize functionality across the entire document.
+ * 
+ * @param defaultWidth - Initial column width in pixels
+ * @param minWidth - Minimum allowed width (default: 80px)
+ * @param maxWidth - Maximum allowed width (default: 400px)
+ * @returns { width, handleMouseDown } - Current width and mouse handler for resize handle
+ * 
+ * @example
+ * const { width, handleMouseDown } = useColumnResize(200, 100, 500);
+ * // Use width for column style, handleMouseDown for resize handle
  */
 export function useColumnResize(defaultWidth: number, minWidth = 80, maxWidth = 400) {
     const [width, setWidth] = useState(defaultWidth);

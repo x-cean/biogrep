@@ -1,3 +1,13 @@
+/**
+ * TabBar Component - Search result type navigation
+ * 
+ * Displays tabs for switching between different search result views:
+ * - 📁 Filename: Results from fd (fast file finder)
+ * - 📄 Pure Text: Results from rg (ripgrep) for plain text files
+ * - 📚 Documents: Results from rga (ripgrep-all) for PDFs, Word docs, etc.
+ * 
+ * Each tab shows a badge with the count of results when > 0.
+ */
 import { TabType } from "../types";
 
 interface TabBarProps {

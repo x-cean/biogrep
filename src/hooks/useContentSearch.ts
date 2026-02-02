@@ -2,14 +2,6 @@ import { useCallback } from "react";
 import { Command, Child } from "@tauri-apps/plugin-shell";
 import { SearchResult } from "../types";
 import { LineBuffer, ThrottledAccumulator } from "../utils/stream";
-
-/**
- * useContentSearch Hook - Text content search using ripgrep
- * 
- * Searches file contents using the rg sidecar binary.
- * Results include: file path, line number, and matching line content.
- */
-
 import { CONFIG } from "../config";
 
 /**

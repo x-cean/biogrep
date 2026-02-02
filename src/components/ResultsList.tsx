@@ -1,3 +1,18 @@
+/**
+ * ResultsList Components - Specialized result displays
+ * 
+ * This file contains three result list components, each specialized
+ * for a different search type. All use UnifiedResultList internally.
+ * 
+ * - FileResultsList: Displays fd filename search results
+ * - ContentResultsList: Displays rg text content search results  
+ * - DocResultsList: Displays rga document search results
+ * 
+ * Each component:
+ * - Highlights matched terms in the results
+ * - Opens the file when the primary column is clicked
+ * - Shows the file path in the secondary column
+ */
 import { openPath } from "@tauri-apps/plugin-opener";
 import { SearchResult, FileResult, DocResult } from "../types";
 import { highlightText } from "../utils/highlightText";
