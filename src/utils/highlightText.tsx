@@ -7,7 +7,13 @@ import React from "react";
  */
 export function highlightText(text: string, queries: string | string[]): React.ReactNode {
     // Normalize to array and filter empty/short queries
-    const queryList = (Array.isArray(queries) ? queries : [queries])
+    // Normalize to array, split by commas, and filter empty/short queries
+    const rawList: string[] = Array.isArray(queries) ? queries : [queries];
+
+    // Flatten and split any comma-separated strings
+    const queryList = rawList
+        .flatMap(q => q.includes(",") ? q.split(",") : [q])
+        .map(q => q.trim())
         .filter(q => q && q.length >= 2);
 
     if (queryList.length === 0) {

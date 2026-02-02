@@ -101,11 +101,27 @@ export function useSearch() {
             resetExpansion();
 
             try {
+                // Transform query if it contains commas (multi-term search)
+                let effectiveQuery = query;
+                if (query.includes(",")) {
+                    const terms = query
+                        .split(",")
+                        .map((t) => t.trim())
+                        .filter((t) => t.length > 0);
+
+                    if (terms.length > 1) {
+                        effectiveQuery = `(${terms.join("|")})`;
+                    } else if (terms.length === 1) {
+                        // Handle "term1," case - just search "term1"
+                        effectiveQuery = terms[0];
+                    }
+                }
+
                 // Run initial search in parallel
                 await Promise.all([
-                    runFileSearch(currentSearchId, query, searchPath, false, setFileResults),
-                    runContentSearch(currentSearchId, query, searchPath, false, setResults, setError),
-                    runDocSearch(currentSearchId, query, searchPath, false, setDocResults),
+                    runFileSearch(currentSearchId, effectiveQuery, searchPath, false, setFileResults),
+                    runContentSearch(currentSearchId, effectiveQuery, searchPath, false, setResults, setError),
+                    runDocSearch(currentSearchId, effectiveQuery, searchPath, false, setDocResults),
                 ]);
 
                 // Check for sparse results and trigger expansion

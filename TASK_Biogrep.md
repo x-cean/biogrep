@@ -3,7 +3,9 @@
 - [x] **Phase 1: Project Initialization (The Scaffold)**
     - [x] Initialize Tauri v2 + React + TypeScript project
     - [x] Configure TailwindCSS and shadcn/ui
+    - [x] Configure TailwindCSS and shadcn/ui
     - [x] **Configure Tauri Sidecar Permissions:** distinct setup in `tauri.conf.json` to allow execution of `rg` and `fd`.
+    - [/] **Multi-Term Search:** Allow users to search "term1, term2" by converting to regex `(term1|term2)`. <!-- id: new -->
     - [ ] **Cross-Platform Check:** Verify the `rg` binary runs correctly on the target OS (Mac/Win/Linux).
 
 - [x] **Phase 2: Core Search Engine (The Rust Backend)**
