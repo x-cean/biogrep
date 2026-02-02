@@ -88,15 +88,16 @@ export function useQueryExpansion({
                 setExpandedTerms(terms);
 
                 // Run searches for expanded terms (accumulate results)
-                for (const term of terms) {
-                    if (getSearchId() !== currentSearchId) break;
+                // Run searches for expanded terms (accumulate results)
+                // Combine terms into a single regex query for efficiency
+                // e.g. (term1|term2|term3)
+                const combinedQuery = `(${terms.join("|")})`;
 
-                    await Promise.all([
-                        runFileSearch(currentSearchId, term, searchPath, true, setFileResults),
-                        runContentSearch(currentSearchId, term, searchPath, true, setResults, setError),
-                        runDocSearch(currentSearchId, term, searchPath, true, setDocResults),
-                    ]);
-                }
+                await Promise.all([
+                    runFileSearch(currentSearchId, combinedQuery, searchPath, true, setFileResults),
+                    runContentSearch(currentSearchId, combinedQuery, searchPath, true, setResults, setError),
+                    runDocSearch(currentSearchId, combinedQuery, searchPath, true, setDocResults),
+                ]);
             } catch (err) {
                 console.error("Query expansion failed:", err);
             } finally {
