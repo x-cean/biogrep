@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { Command, Child } from "@tauri-apps/plugin-shell";
 import { DocResult } from "../types";
 import { LineBuffer, ThrottledAccumulator } from "../utils/stream";
+import { CONFIG } from "../config";
 
 /**
  * useDocSearch Hook - Document search using ripgrep-all
@@ -10,11 +11,6 @@ import { LineBuffer, ThrottledAccumulator } from "../utils/stream";
  * rga uses adapters (pdftotext, pandoc) to extract text from binary formats.
  * Results include: file path, line number, and matching line content.
  */
-
-const MAX_RESULTS = 20000;
-
-// PATH for rga to find adapter binaries (pdftotext, pandoc)
-const RGA_PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin";
 
 interface UseDocSearchOptions {
     rgaChildRef: React.MutableRefObject<Child | null>;
@@ -45,7 +41,7 @@ export function useDocSearch({ rgaChildRef, getSearchId }: UseDocSearchOptions) 
                         ["--json", "--max-count", "200", query, path],
                         {
                             env: {
-                                PATH: RGA_PATH,
+                                PATH: CONFIG.PATHS.RGA_ENV_PATH,
                             },
                         }
                     );
@@ -55,7 +51,7 @@ export function useDocSearch({ rgaChildRef, getSearchId }: UseDocSearchOptions) 
                     const accumulator = new ThrottledAccumulator<DocResult>((batch) => {
                         if (getSearchId() === currentSearchId) {
                             setResults((prev) => {
-                                if (prev.length >= MAX_RESULTS) return prev;
+                                if (prev.length >= CONFIG.SEARCH.MAX_DOC_RESULTS) return prev;
 
                                 if (accumulate) {
                                     const seen = new Set(
@@ -64,10 +60,10 @@ export function useDocSearch({ rgaChildRef, getSearchId }: UseDocSearchOptions) 
                                     const unique = batch.filter(
                                         (r) => !seen.has(`${r.path}:${r.lineNumber}:${r.lineContent}`)
                                     );
-                                    return [...prev, ...unique].slice(0, MAX_RESULTS);
+                                    return [...prev, ...unique].slice(0, CONFIG.SEARCH.MAX_DOC_RESULTS);
                                 }
 
-                                return [...prev, ...batch].slice(0, MAX_RESULTS);
+                                return [...prev, ...batch].slice(0, CONFIG.SEARCH.MAX_DOC_RESULTS);
                             });
                         }
                     }, 50, 50);

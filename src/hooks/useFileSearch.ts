@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { Command, Child } from "@tauri-apps/plugin-shell";
 import { FileResult } from "../types";
 import { LineBuffer, ThrottledAccumulator } from "../utils/stream";
+import { CONFIG } from "../config";
 
 /**
  * useFileSearch Hook - Filename search using fd
@@ -9,8 +10,6 @@ import { LineBuffer, ThrottledAccumulator } from "../utils/stream";
  * Searches filenames using the fd sidecar binary.
  * Results include: file path and filename.
  */
-
-const MAX_FILE_RESULTS = 5000;
 
 interface UseFileSearchOptions {
     fdChildRef: React.MutableRefObject<Child | null>;
@@ -40,7 +39,7 @@ export function useFileSearch({ fdChildRef, getSearchId }: UseFileSearchOptions)
                         query,
                         path,
                         "--max-results",
-                        String(MAX_FILE_RESULTS),
+                        String(CONFIG.SEARCH.MAX_FILE_RESULTS),
                     ]);
 
                     const lineBuffer = new LineBuffer();
@@ -48,15 +47,15 @@ export function useFileSearch({ fdChildRef, getSearchId }: UseFileSearchOptions)
                     const accumulator = new ThrottledAccumulator<FileResult>((batch) => {
                         if (getSearchId() === currentSearchId) {
                             setResults((prev) => {
-                                if (prev.length >= MAX_FILE_RESULTS) return prev;
+                                if (prev.length >= CONFIG.SEARCH.MAX_FILE_RESULTS) return prev;
 
                                 if (accumulate) {
                                     const seen = new Set(prev.map((r) => r.path));
                                     const unique = batch.filter((r) => !seen.has(r.path));
-                                    return [...prev, ...unique].slice(0, MAX_FILE_RESULTS);
+                                    return [...prev, ...unique].slice(0, CONFIG.SEARCH.MAX_FILE_RESULTS);
                                 }
 
-                                return [...prev, ...batch].slice(0, MAX_FILE_RESULTS);
+                                return [...prev, ...batch].slice(0, CONFIG.SEARCH.MAX_FILE_RESULTS);
                             });
                         }
                     }, 50, 50);

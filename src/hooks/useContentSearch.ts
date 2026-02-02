@@ -10,7 +10,14 @@ import { LineBuffer, ThrottledAccumulator } from "../utils/stream";
  * Results include: file path, line number, and matching line content.
  */
 
-const MAX_RESULTS = 20000; // Reduced slightly for better stream performance
+import { CONFIG } from "../config";
+
+/**
+ * useContentSearch Hook - Text content search using ripgrep
+ * 
+ * Searches file contents using the rg sidecar binary.
+ * Results include: file path, line number, and matching line content.
+ */
 
 interface UseContentSearchOptions {
     rgChildRef: React.MutableRefObject<Child | null>;
@@ -41,7 +48,7 @@ export function useContentSearch({ rgChildRef, getSearchId }: UseContentSearchOp
                     const command = Command.sidecar("binaries/rg", [
                         "--json",
                         "--max-count",
-                        "200", // Limit matches per file to avoid flooding
+                        String(CONFIG.SEARCH.MAX_MATCHES_PER_FILE), // Limit matches per file to avoid flooding
                         query,
                         path,
                     ]);
@@ -53,7 +60,7 @@ export function useContentSearch({ rgChildRef, getSearchId }: UseContentSearchOp
                         if (getSearchId() === currentSearchId) {
                             setResults((prev) => {
                                 // Safety check to stop growing if we hit limit
-                                if (prev.length >= MAX_RESULTS) return prev;
+                                if (prev.length >= CONFIG.SEARCH.MAX_CONTENT_RESULTS) return prev;
 
                                 // When accumulating (LLM expansion), we might duplicate, so filter
                                 // But for main search stream, raw append is faster.
@@ -63,10 +70,10 @@ export function useContentSearch({ rgChildRef, getSearchId }: UseContentSearchOp
                                     const unique = batch.filter(
                                         (r) => !seen.has(`${r.path}:${r.lineNumber}`)
                                     );
-                                    return [...prev, ...unique].slice(0, MAX_RESULTS);
+                                    return [...prev, ...unique].slice(0, CONFIG.SEARCH.MAX_CONTENT_RESULTS);
                                 }
 
-                                return [...prev, ...batch].slice(0, MAX_RESULTS);
+                                return [...prev, ...batch].slice(0, CONFIG.SEARCH.MAX_CONTENT_RESULTS);
                             });
                         }
                     }, 50, 50);

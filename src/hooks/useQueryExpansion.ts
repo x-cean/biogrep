@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { getDefaultProvider } from "../lib/llm";
 import { SearchResult, FileResult, DocResult } from "../types";
+import { CONFIG } from "../config";
 
 /**
  * useQueryExpansion Hook - LLM-powered query expansion
@@ -10,7 +11,6 @@ import { SearchResult, FileResult, DocResult } from "../types";
  */
 
 // If initial search returns fewer than this many results, trigger LLM expansion
-const SPARSE_RESULTS_THRESHOLD = 5;
 
 interface UseQueryExpansionOptions {
     getSearchId: () => number;
@@ -62,9 +62,9 @@ export function useQueryExpansion({
             setDocResults: React.Dispatch<React.SetStateAction<DocResult[]>>,
             setError: React.Dispatch<React.SetStateAction<string>>
         ) => {
-            console.log("[Search] Total results:", totalResults, "Threshold:", SPARSE_RESULTS_THRESHOLD);
+            console.log("[Search] Total results:", totalResults, "Threshold:", CONFIG.SEARCH.SPARSE_RESULTS_THRESHOLD);
 
-            if (totalResults >= SPARSE_RESULTS_THRESHOLD || getSearchId() !== currentSearchId) {
+            if (totalResults >= CONFIG.SEARCH.SPARSE_RESULTS_THRESHOLD || getSearchId() !== currentSearchId) {
                 return;
             }
 

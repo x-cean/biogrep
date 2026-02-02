@@ -32,13 +32,15 @@ export function useProcessManager() {
      */
     const killAllProcesses = useCallback(async () => {
         const killProcess = async (ref: React.MutableRefObject<Child | null>) => {
-            if (ref.current) {
+            const child = ref.current;
+            if (child) {
+                // Determine if the child process is still valid before trying to kill
+                ref.current = null; // Clear ref immediately to prevent race conditions
                 try {
-                    await ref.current.kill();
-                } catch {
-                    // Process may have already exited
+                    await child.kill();
+                } catch (e) {
+                    console.warn("Failed to kill process:", e);
                 }
-                ref.current = null;
             }
         };
 

@@ -1,8 +1,8 @@
-import { Virtuoso } from "react-virtuoso";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { SearchResult, FileResult, DocResult } from "../types";
 import { highlightText } from "../utils/highlightText";
-import { useColumnResize } from "../hooks/useColumnResize";
+import { UnifiedResultList } from "./UnifiedResultList";
+import { CONFIG } from "../config";
 
 interface FileResultsListProps {
     data: FileResult[];
@@ -12,31 +12,19 @@ interface FileResultsListProps {
 
 export function FileResultsList({ data, query, expandedTerms = [] }: FileResultsListProps) {
     const allTerms = query ? [query, ...expandedTerms] : expandedTerms;
-    const { width: filenameWidth, handleMouseDown } = useColumnResize(200, 80, 500);
 
     return (
-        <Virtuoso
-            style={{ height: "100%" }}
+        <UnifiedResultList
             data={data}
-            itemContent={(_index, r) => (
-                <div
-                    title={r.path}
-                    className="flex hover:bg-gray-800 px-2 py-1 rounded"
-                >
-                    <span
-                        onClick={() => openPath(r.path)}
-                        className="text-purple-400 truncate hover:underline shrink-0 cursor-pointer"
-                        style={{ width: filenameWidth }}
-                    >
-                        {allTerms.length > 0 ? highlightText(r.filename, allTerms) : r.filename}
-                    </span>
-                    <div
-                        className="w-px mx-1 bg-gray-600 hover:bg-blue-400 hover:w-1 cursor-col-resize shrink-0 transition-all"
-                        onMouseDown={handleMouseDown}
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                    <span className="text-gray-500 truncate text-[10px]">{r.path}</span>
-                </div>
+            initialColumnWidth={CONFIG.UI.COLUMN_WIDTHS.FILENAME_DEFAULT}
+            onPrimaryClick={(r) => openPath(r.path)}
+            renderPrimaryColumn={(r) => (
+                <span className="text-purple-400">
+                    {allTerms.length > 0 ? highlightText(r.filename, allTerms) : r.filename}
+                </span>
+            )}
+            renderSecondaryContent={(r) => (
+                <span className="text-gray-500 truncate text-[10px]">{r.path}</span>
             )}
         />
     );
@@ -50,34 +38,26 @@ interface ContentResultsListProps {
 
 export function ContentResultsList({ data, query, expandedTerms = [] }: ContentResultsListProps) {
     const allTerms = [query, ...expandedTerms];
-    const { width: pathWidth, handleMouseDown } = useColumnResize(160, 80, 400);
 
     return (
-        <Virtuoso
-            style={{ height: "100%" }}
+        <UnifiedResultList
             data={data}
-            itemContent={(_index, r) => (
-                <div
-                    title={r.path}
-                    className="flex hover:bg-gray-800 px-2 py-1 rounded"
-                >
-                    <span
-                        onClick={() => openPath(r.path)}
-                        className="text-blue-400 truncate hover:underline shrink-0 cursor-pointer"
-                        style={{ width: pathWidth }}
-                    >
-                        {r.path.split("/").pop()}
-                    </span>
-                    <div
-                        className="w-px mx-1 bg-gray-600 hover:bg-blue-400 hover:w-1 cursor-col-resize shrink-0 transition-all"
-                        onMouseDown={handleMouseDown}
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                    <span className="text-yellow-500 shrink-0 w-10 text-right mr-2">
+            initialColumnWidth={CONFIG.UI.COLUMN_WIDTHS.PATH_DEFAULT}
+            onPrimaryClick={(r) => openPath(r.path)}
+            renderPrimaryColumn={(r) => (
+                <span className="text-blue-400">
+                    {r.path ? r.path.split("/").pop() : "Unknown File"}
+                </span>
+            )}
+            renderSecondaryContent={(r) => (
+                <>
+                    <span className="text-yellow-500 shrink-0 w-10 text-right mr-2 font-mono">
                         {r.lineNumber}
                     </span>
-                    <span className="text-gray-300 truncate">{highlightText(r.lineContent, allTerms)}</span>
-                </div>
+                    <span className="text-gray-300 truncate font-mono">
+                        {r.lineContent ? highlightText(r.lineContent, allTerms) : ""}
+                    </span>
+                </>
             )}
         />
     );
@@ -91,36 +71,28 @@ interface DocResultsListProps {
 
 export function DocResultsList({ data, query, expandedTerms = [] }: DocResultsListProps) {
     const allTerms = [query, ...expandedTerms];
-    const { width: pathWidth, handleMouseDown } = useColumnResize(160, 80, 400);
 
     return (
-        <Virtuoso
-            style={{ height: "100%" }}
+        <UnifiedResultList
             data={data}
-            itemContent={(_index, r) => (
-                <div
-                    title={r.path}
-                    className="flex hover:bg-gray-800 px-2 py-1 rounded"
-                >
-                    <span
-                        onClick={() => openPath(r.path)}
-                        className="text-green-400 truncate hover:underline shrink-0 cursor-pointer"
-                        style={{ width: pathWidth }}
-                    >
-                        {r.path.split("/").pop()}
-                    </span>
-                    <div
-                        className="w-px mx-1 bg-gray-600 hover:bg-blue-400 hover:w-1 cursor-col-resize shrink-0 transition-all"
-                        onMouseDown={handleMouseDown}
-                        onClick={(e) => e.stopPropagation()}
-                    />
+            initialColumnWidth={CONFIG.UI.COLUMN_WIDTHS.PATH_DEFAULT}
+            onPrimaryClick={(r) => openPath(r.path)}
+            renderPrimaryColumn={(r) => (
+                <span className="text-green-400">
+                    {r.path ? r.path.split("/").pop() : "Unknown File"}
+                </span>
+            )}
+            renderSecondaryContent={(r) => (
+                <>
                     {r.lineNumber > 0 && (
-                        <span className="text-yellow-500 shrink-0 w-10 text-right mr-2">
+                        <span className="text-yellow-500 shrink-0 w-10 text-right mr-2 font-mono">
                             {r.lineNumber}
                         </span>
                     )}
-                    <span className="text-gray-300 truncate">{highlightText(r.lineContent, allTerms)}</span>
-                </div>
+                    <span className="text-gray-300 truncate font-mono">
+                        {r.lineContent ? highlightText(r.lineContent, allTerms) : ""}
+                    </span>
+                </>
             )}
         />
     );
