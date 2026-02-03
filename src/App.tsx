@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useSearch } from "./hooks/useSearch";
+import { useCloudFolderDetection } from "./hooks/useCloudFolderDetection";
 import { SearchBar } from "./components/SearchBar";
 import { TabBar } from "./components/TabBar";
+import { CloudWarningDialog } from "./components/CloudWarningDialog";
 import { FileResultsList, ContentResultsList, DocResultsList } from "./components/ResultsList";
 import { TabType } from "./types";
 
@@ -22,6 +24,43 @@ function App() {
     stopSearch,
   } = useSearch();
 
+  // Cloud folder detection
+  const { needsWarning, acknowledgePath } = useCloudFolderDetection();
+  const [pendingCloudPath, setPendingCloudPath] = useState<{
+    path: string;
+    provider: string;
+  } | null>(null);
+
+  // Wrap setSearchPath to check for cloud folders first
+  const handleSetSearchPath = useCallback(
+    (newPath: string) => {
+      const detection = needsWarning(newPath);
+
+      if (detection.needsWarning && detection.provider) {
+        // Show warning dialog, don't set path yet
+        setPendingCloudPath({ path: newPath, provider: detection.provider });
+      } else {
+        // Safe to proceed
+        setSearchPath(newPath);
+      }
+    },
+    [needsWarning, setSearchPath]
+  );
+
+  // Handle warning dialog actions
+  const handleCloudWarningCancel = useCallback(() => {
+    setPendingCloudPath(null);
+    // Don't change the current path
+  }, []);
+
+  const handleCloudWarningContinue = useCallback(() => {
+    if (pendingCloudPath) {
+      acknowledgePath(pendingCloudPath.path);
+      setSearchPath(pendingCloudPath.path);
+      setPendingCloudPath(null);
+    }
+  }, [pendingCloudPath, acknowledgePath, setSearchPath]);
+
   const [activeTab, setActiveTab] = useState<TabType>("content");
 
   return (
@@ -30,7 +69,7 @@ function App() {
         query={query}
         setQuery={setQuery}
         searchPath={searchPath}
-        setSearchPath={setSearchPath}
+        setSearchPath={handleSetSearchPath}
         loading={loading}
         isExpanding={isExpanding}
         expandedTerms={expandedTerms}
@@ -93,6 +132,15 @@ function App() {
           </p>
         )}
       </div>
+
+      {/* Cloud folder warning dialog */}
+      <CloudWarningDialog
+        isOpen={pendingCloudPath !== null}
+        provider={pendingCloudPath?.provider ?? ""}
+        path={pendingCloudPath?.path ?? ""}
+        onCancel={handleCloudWarningCancel}
+        onContinue={handleCloudWarningContinue}
+      />
     </main>
   );
 }
