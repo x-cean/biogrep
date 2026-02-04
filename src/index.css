@@ -1,1 +1,14 @@
 @import "tailwindcss";
+
+/* Ensure full viewport coverage with dark background */
+html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #111827; /* gray-900 */
+}
+
+/* Prevent overscroll bounce showing white background on macOS */
+html {
+    overscroll-behavior: none;
+}

@@ -57,26 +57,27 @@ export function ChatPanel({
         }
     };
 
-    // Collapsed state - show floating button in bottom-right corner
+    // Collapsed state - just return the floating button (rendered via portal-like approach in parent)
     if (isCollapsed) {
         return (
-            <div className="relative flex-shrink-0 w-16 h-full">
+            <>
+                {/* Floating toggle button - fixed to viewport */}
                 <button
                     onClick={onToggleCollapse}
-                    className="absolute right-2 bottom-4 w-12 h-12 bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-105"
+                    className="fixed right-4 bottom-4 z-50 w-12 h-12 bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-105"
                     title="Open chat"
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                 </button>
-            </div>
+            </>
         );
     }
 
-    // Expanded state - full chat panel
+    // Expanded state - full chat panel that takes layout space
     return (
-        <div className="flex-shrink-0 w-80 h-full flex flex-col bg-gray-800 border-l border-gray-700">
+        <div className="flex-shrink-0 w-80 h-full flex flex-col bg-gray-800 border-l border-gray-700 relative">
             {/* Header */}
             <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 flex-shrink-0">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -193,6 +194,17 @@ export function ChatPanel({
                     Enter to send • Shift+Enter for new line
                 </p>
             </div>
+
+            {/* Floating close button at bottom-right of panel */}
+            <button
+                onClick={onToggleCollapse}
+                className="absolute right-4 bottom-20 z-10 w-10 h-10 bg-gray-600 hover:bg-gray-500 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-105"
+                title="Close chat"
+            >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
         </div>
     );
 }
@@ -207,8 +219,8 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
             <div
                 className={`max-w-[90%] rounded-lg px-3 py-2 text-sm shadow-sm ${isUser
-                        ? "bg-blue-600 text-white rounded-br-sm"
-                        : "bg-gray-700 text-gray-100 rounded-bl-sm"
+                    ? "bg-blue-600 text-white rounded-br-sm"
+                    : "bg-gray-700 text-gray-100 rounded-bl-sm"
                     }`}
             >
                 <div className="whitespace-pre-wrap break-words leading-relaxed">
