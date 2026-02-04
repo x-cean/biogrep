@@ -76,6 +76,23 @@ Transform BioGrep from a fast file search tool into an **intelligent work assist
   - [ ] Extract key entities (methods, results, citations)
   - [ ] Answer questions about document content
 
+- [ ] **Result Ranking & Relevance**
+  > *Surface the most relevant results first*
+  
+  - [ ] **Match-based ranking**
+    - [ ] Sort by match density (files with more matches ranked higher)
+    - [ ] Weight rare term matches more heavily (TF-IDF style)
+    - [ ] Consider file recency as secondary signal
+  
+  - [ ] **Semantic ranking** (requires embeddings)
+    - [ ] Compute vector similarity between query and document chunks
+    - [ ] Hybrid scoring: combine keyword score + vector score
+    - [ ] LLM re-ranking for top N results (optional, slower)
+  
+  - [ ] **User signals**
+    - [ ] Boost files user has opened frequently
+    - [ ] Learn from click patterns over time
+
 - [ ] **Structural Parsing (Optional Enhancements)**
   > *Complement semantic search with structure-aware navigation*
   
