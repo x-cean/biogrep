@@ -35,7 +35,10 @@ export function ChatPanel({
     // Focus input when panel opens
     useEffect(() => {
         if (!isCollapsed) {
-            inputRef.current?.focus();
+            const timer = setTimeout(() => {
+                inputRef.current?.focus();
+            }, 100);
+            return () => clearTimeout(timer);
         }
     }, [isCollapsed]);
 
@@ -54,38 +57,44 @@ export function ChatPanel({
         }
     };
 
-    // Collapsed state - show toggle button only
+    // Collapsed state - show floating button in bottom-right corner
     if (isCollapsed) {
         return (
-            <button
-                onClick={onToggleCollapse}
-                className="fixed right-4 bottom-4 w-12 h-12 bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg flex items-center justify-center text-white transition-colors"
-                title="Open chat"
-            >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-            </button>
+            <div className="relative flex-shrink-0 w-16 h-full">
+                <button
+                    onClick={onToggleCollapse}
+                    className="absolute right-2 bottom-4 w-12 h-12 bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-105"
+                    title="Open chat"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                </button>
+            </div>
         );
     }
 
+    // Expanded state - full chat panel
     return (
-        <div className="w-80 border-l border-gray-700 flex flex-col bg-gray-850">
+        <div className="flex-shrink-0 w-80 h-full flex flex-col bg-gray-800 border-l border-gray-700">
             {/* Header */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 bg-gray-800">
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-200">💬 Chat</span>
+            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 flex-shrink-0">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-sm font-medium text-gray-200 flex-shrink-0">💬 Chat</span>
                     {searchContext && searchContext.query && (
-                        <span className="text-xs text-gray-500 truncate max-w-32" title={`Context: ${searchContext.query}`}>
+                        <span
+                            className="text-xs text-gray-500 truncate"
+                            title={`Context: ${searchContext.query}`}
+                        >
                             • {searchContext.query}
                         </span>
                     )}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                     {messages.length > 0 && (
                         <button
                             onClick={onClearChat}
-                            className="p-1 text-gray-400 hover:text-gray-200 transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded transition-colors"
                             title="Clear conversation"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,7 +104,7 @@ export function ChatPanel({
                     )}
                     <button
                         onClick={onToggleCollapse}
-                        className="p-1 text-gray-400 hover:text-gray-200 transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded transition-colors"
                         title="Close chat"
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,18 +114,23 @@ export function ChatPanel({
                 </div>
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {/* Messages area */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
                 {messages.length === 0 && (
                     <div className="text-center text-gray-500 text-sm py-8">
-                        <p>Ask questions about your search results</p>
+                        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-700 flex items-center justify-center">
+                            <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                        </div>
+                        <p className="font-medium text-gray-400">Ask about your files</p>
                         {searchContext && searchContext.query ? (
-                            <p className="mt-2 text-xs">
-                                Try: "What are these files about?" or "Summarize the matches"
+                            <p className="mt-2 text-xs text-gray-600">
+                                Try: "Summarize these results" or<br />"Which file is most relevant?"
                             </p>
                         ) : (
-                            <p className="mt-2 text-xs">
-                                Search for something first, then ask questions here
+                            <p className="mt-2 text-xs text-gray-600">
+                                Search for something first,<br />then ask questions here
                             </p>
                         )}
                     </div>
@@ -127,23 +141,32 @@ export function ChatPanel({
                 ))}
 
                 {isLoading && (
-                    <div className="flex items-center gap-2 text-gray-400 text-sm">
-                        <div className="animate-pulse">●</div>
+                    <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
+                        <div className="flex gap-1">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                            <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                            <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                        </div>
                         <span>Thinking...</span>
                     </div>
                 )}
 
                 {error && (
-                    <div className="bg-red-900/30 border border-red-700 rounded-lg p-2 text-sm text-red-300">
-                        {error}
+                    <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm text-red-300">
+                        <div className="flex items-start gap-2">
+                            <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>{error}</span>
+                        </div>
                     </div>
                 )}
 
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <div className="border-t border-gray-700 p-2">
+            {/* Input area */}
+            <div className="border-t border-gray-700 p-3 flex-shrink-0">
                 <div className="flex gap-2">
                     <textarea
                         ref={inputRef}
@@ -152,22 +175,22 @@ export function ChatPanel({
                         onKeyDown={handleKeyDown}
                         placeholder="Ask about your files..."
                         disabled={isLoading}
-                        className="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                        className="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 placeholder-gray-500"
                         rows={2}
                     />
                     <button
                         onClick={handleSend}
                         disabled={!input.trim() || isLoading}
-                        className="px-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors"
-                        title="Send message"
+                        className="px-3 self-end bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors h-10"
+                        title="Send message (Enter)"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                         </svg>
                     </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1 px-1">
-                    Press Enter to send, Shift+Enter for new line
+                <p className="text-xs text-gray-600 mt-1.5 px-1">
+                    Enter to send • Shift+Enter for new line
                 </p>
             </div>
         </div>
@@ -183,12 +206,12 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     return (
         <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
             <div
-                className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${isUser
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-700 text-gray-100"
+                className={`max-w-[90%] rounded-lg px-3 py-2 text-sm shadow-sm ${isUser
+                        ? "bg-blue-600 text-white rounded-br-sm"
+                        : "bg-gray-700 text-gray-100 rounded-bl-sm"
                     }`}
             >
-                <div className="whitespace-pre-wrap break-words">
+                <div className="whitespace-pre-wrap break-words leading-relaxed">
                     {message.content}
                 </div>
             </div>

@@ -84,9 +84,9 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabType>("content");
 
   return (
-    <main className="flex h-screen bg-gray-900 text-white">
-      {/* Left side: Search UI */}
-      <div className="flex-1 flex flex-col min-w-0">
+    <main className="flex h-screen bg-gray-900 text-white overflow-hidden">
+      {/* Left side: Search UI - takes remaining space, has min-width for usability */}
+      <div className="flex-1 flex flex-col min-w-0 relative">
         <SearchBar
           query={query}
           setQuery={setQuery}
