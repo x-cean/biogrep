@@ -1,5 +1,5 @@
 export { GeminiProvider } from "./gemini";
-export type { LLMProvider, LLMConfig, LLMProviderType } from "./types";
+export type { LLMProvider, LLMConfig, LLMProviderType, ChatMessage, ChatOptions, ChatResponse } from "./types";
 
 import { LLMProvider, LLMConfig, LLMProviderType } from "./types";
 import { GeminiProvider } from "./gemini";
