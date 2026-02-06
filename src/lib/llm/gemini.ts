@@ -68,13 +68,16 @@ export class GeminiProvider implements LLMProvider {
             const data = await response.json();
             const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-            // Parse response: split by newlines, clean up, filter empty
+            console.log("[LLM] Raw expansion response:", text);
+
+            // Parse response: split by newlines AND commas, clean up, filter empty
             const terms = text
-                .split("\n")
+                .split(/[\n,]+/)  // Split by newlines OR commas
                 .map((line: string) => line.trim().toLowerCase())
-                .filter((term: string) => term && term !== query.toLowerCase())
+                .filter((term: string) => term && term !== query.toLowerCase() && term.length > 1)
                 .slice(0, 5);
 
+            console.log("[LLM] Parsed terms:", terms);
             return terms;
         } catch (err) {
             console.error("Query expansion failed:", err);
