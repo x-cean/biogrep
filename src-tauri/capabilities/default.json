@@ -58,6 +58,15 @@
         }
       ]
     },
-    "dialog:default"
+    "dialog:default",
+    "fs:default",
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [
+        {
+          "path": "/**"
+        }
+      ]
+    }
   ]
 }

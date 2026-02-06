@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { ChatMessage } from "../lib/llm";
 import { SearchContext } from "../hooks/useChat";
+import { FocusedFile } from "../types";
 
 interface ChatPanelProps {
     messages: ChatMessage[];
@@ -11,6 +12,8 @@ interface ChatPanelProps {
     searchContext?: SearchContext;
     isCollapsed: boolean;
     onToggleCollapse: () => void;
+    focusedFile?: FocusedFile | null;
+    onClearFocusedFile?: () => void;
 }
 
 export function ChatPanel({
@@ -22,6 +25,8 @@ export function ChatPanel({
     searchContext,
     isCollapsed,
     onToggleCollapse,
+    focusedFile,
+    onClearFocusedFile,
 }: ChatPanelProps) {
     const [input, setInput] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -82,7 +87,27 @@ export function ChatPanel({
             <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 flex-shrink-0">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className="text-sm font-medium text-gray-200 flex-shrink-0">💬 Chat</span>
-                    {searchContext && searchContext.query && (
+                    {focusedFile && (
+                        <span
+                            className="flex items-center gap-1 text-xs bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded truncate"
+                            title={focusedFile.path}
+                        >
+                            📎 {focusedFile.filename}
+                            {focusedFile.truncated && (
+                                <span className="text-yellow-400" title="File was truncated">⚠️</span>
+                            )}
+                            {onClearFocusedFile && (
+                                <button
+                                    onClick={onClearFocusedFile}
+                                    className="ml-1 hover:text-white"
+                                    title="Clear file context"
+                                >
+                                    ×
+                                </button>
+                            )}
+                        </span>
+                    )}
+                    {!focusedFile && searchContext && searchContext.query && (
                         <span
                             className="text-xs text-gray-500 truncate"
                             title={`Context: ${searchContext.query}`}

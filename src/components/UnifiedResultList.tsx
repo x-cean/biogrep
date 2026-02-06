@@ -35,6 +35,11 @@ interface UnifiedResultListProps<T> {
      */
     onPrimaryClick: (item: T) => void;
     /**
+     * Optional render function for action buttons at the end of each row.
+     * Shows on hover.
+     */
+    renderActions?: (item: T) => ReactNode;
+    /**
      * Optional key generator for Virtuoso
      */
     computeItemKey?: (index: number, item: T) => string;
@@ -46,6 +51,7 @@ export function UnifiedResultList<T>({
     renderPrimaryColumn,
     renderSecondaryContent,
     onPrimaryClick,
+    renderActions,
 }: UnifiedResultListProps<T>) {
     const { width, handleMouseDown } = useColumnResize(
         initialColumnWidth,
@@ -78,6 +84,13 @@ export function UnifiedResultList<T>({
                     <div className="flex-1 min-w-0 flex items-center">
                         {renderSecondaryContent(item)}
                     </div>
+
+                    {/* Optional Actions */}
+                    {renderActions && (
+                        <div className="flex-shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {renderActions(item)}
+                        </div>
+                    )}
                 </div>
             )}
         />

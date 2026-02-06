@@ -17,3 +17,11 @@ export interface DocResult {
 }
 
 export type TabType = "files" | "content" | "docs";
+
+export interface FocusedFile {
+    path: string;
+    filename: string;
+    content: string;
+    isDocument: boolean;
+    truncated: boolean;
+}

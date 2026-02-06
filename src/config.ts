@@ -22,5 +22,11 @@ export const CONFIG = {
             PATH_MIN: 80,
             PATH_MAX: 400,
         }
+    },
+    FILE_READER: {
+        // Max file size to read (50KB) - larger files will be truncated
+        MAX_SIZE_BYTES: 50 * 1024,
+        // Document extensions that need rga extraction
+        DOCUMENT_EXTENSIONS: ['.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls', '.odt', '.epub'],
     }
 } as const;

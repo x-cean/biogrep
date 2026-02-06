@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { SearchResult, FileResult, DocResult } from "../types";
 import { useProcessManager } from "./useProcessManager";
 import { useFileSearch } from "./useFileSearch";
@@ -31,6 +31,11 @@ export function useSearch() {
     const [results, setResults] = useState<SearchResult[]>([]);
     const [fileResults, setFileResults] = useState<FileResult[]>([]);
     const [docResults, setDocResults] = useState<DocResult[]>([]);
+
+    // ============ REFS FOR RESULTS (to read counts without setState callbacks) ============
+    const resultsRef = useRef<SearchResult[]>([]);
+    const fileResultsRef = useRef<FileResult[]>([]);
+    const docResultsRef = useRef<DocResult[]>([]);
 
     // ============ UI STATE ============
     const [loading, setLoading] = useState(false);
@@ -98,6 +103,10 @@ export function useSearch() {
             setResults([]);
             setFileResults([]);
             setDocResults([]);
+            // Also clear refs
+            resultsRef.current = [];
+            fileResultsRef.current = [];
+            docResultsRef.current = [];
             resetExpansion();
 
             try {
@@ -117,42 +126,54 @@ export function useSearch() {
                     }
                 }
 
-                // Run initial search in parallel
+                // Run initial search in parallel, with wrapper setters that also update refs
+                const wrappedSetResults = (updater: React.SetStateAction<SearchResult[]>) => {
+                    setResults(prev => {
+                        const next = typeof updater === 'function' ? updater(prev) : updater;
+                        resultsRef.current = next;
+                        return next;
+                    });
+                };
+                const wrappedSetFileResults = (updater: React.SetStateAction<FileResult[]>) => {
+                    setFileResults(prev => {
+                        const next = typeof updater === 'function' ? updater(prev) : updater;
+                        fileResultsRef.current = next;
+                        return next;
+                    });
+                };
+                const wrappedSetDocResults = (updater: React.SetStateAction<DocResult[]>) => {
+                    setDocResults(prev => {
+                        const next = typeof updater === 'function' ? updater(prev) : updater;
+                        docResultsRef.current = next;
+                        return next;
+                    });
+                };
+
                 await Promise.all([
-                    runFileSearch(currentSearchId, effectiveQuery, searchPath, false, setFileResults),
-                    runContentSearch(currentSearchId, effectiveQuery, searchPath, false, setResults, setError),
-                    runDocSearch(currentSearchId, effectiveQuery, searchPath, false, setDocResults),
+                    runFileSearch(currentSearchId, effectiveQuery, searchPath, false, wrappedSetFileResults),
+                    runContentSearch(currentSearchId, effectiveQuery, searchPath, false, wrappedSetResults, setError),
+                    runDocSearch(currentSearchId, effectiveQuery, searchPath, false, wrappedSetDocResults),
                 ]);
 
                 // Check for sparse results and trigger expansion
+                // Use refs to read counts directly (avoids calling async code inside setState)
                 if (getSearchId() === currentSearchId) {
-                    // Read current results counts
-                    setResults((currentResults) => {
-                        setFileResults((currentFileResults) => {
-                            setDocResults((currentDocResults) => {
-                                const totalResults =
-                                    currentResults.length +
-                                    currentFileResults.length +
-                                    currentDocResults.length;
+                    const totalResults =
+                        resultsRef.current.length +
+                        fileResultsRef.current.length +
+                        docResultsRef.current.length;
 
-                                // Trigger expansion in async context
-                                checkAndExpand(
-                                    currentSearchId,
-                                    query,
-                                    searchPath,
-                                    totalResults,
-                                    setFileResults,
-                                    setResults,
-                                    setDocResults,
-                                    setError
-                                );
-
-                                return currentDocResults;
-                            });
-                            return currentFileResults;
-                        });
-                        return currentResults;
-                    });
+                    // Trigger expansion (async but called outside setState)
+                    checkAndExpand(
+                        currentSearchId,
+                        query,
+                        searchPath,
+                        totalResults,
+                        wrappedSetFileResults,
+                        wrappedSetResults,
+                        wrappedSetDocResults,
+                        setError
+                    );
                 }
             } catch (err) {
                 if (getSearchId() === currentSearchId) {

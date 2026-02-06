@@ -1,13 +1,14 @@
 import { useState, useCallback, useMemo } from "react";
 import { useSearch } from "./hooks/useSearch";
 import { useChat, SearchContext } from "./hooks/useChat";
+import { useFileReader } from "./hooks/useFileReader";
 import { useCloudFolderDetection } from "./hooks/useCloudFolderDetection";
 import { SearchBar } from "./components/SearchBar";
 import { TabBar } from "./components/TabBar";
 import { CloudWarningDialog } from "./components/CloudWarningDialog";
 import { ChatPanel } from "./components/ChatPanel";
 import { FileResultsList, ContentResultsList, DocResultsList } from "./components/ResultsList";
-import { TabType } from "./types";
+import { TabType, FocusedFile } from "./types";
 
 function App() {
   const {
@@ -36,13 +37,32 @@ function App() {
   } = useChat();
   const [isChatCollapsed, setIsChatCollapsed] = useState(true);
 
+  // File reader for focused file
+  const { readFile, isReading: isReadingFile } = useFileReader();
+  const [focusedFile, setFocusedFile] = useState<FocusedFile | null>(null);
+
+  // Handle "Ask about this file" click
+  const handleAskAboutFile = useCallback(async (path: string) => {
+    const file = await readFile(path);
+    if (file) {
+      setFocusedFile(file);
+      setIsChatCollapsed(false); // Open chat panel
+    }
+  }, [readFile]);
+
+  // Clear focused file
+  const handleClearFocusedFile = useCallback(() => {
+    setFocusedFile(null);
+  }, []);
+
   // Build search context for chat
   const searchContext: SearchContext = useMemo(() => ({
     query,
     results,
     fileResults,
     docResults,
-  }), [query, results, fileResults, docResults]);
+    focusedFile: focusedFile ?? undefined,
+  }), [query, results, fileResults, docResults, focusedFile]);
 
   // Cloud folder detection
   const { needsWarning, acknowledgePath } = useCloudFolderDetection();
@@ -110,7 +130,12 @@ function App() {
 
         <div className="flex-1 overflow-hidden p-2 font-mono text-xs">
           {activeTab === "files" && fileResults.length > 0 && (
-            <FileResultsList data={fileResults} query={query} expandedTerms={expandedTerms} />
+            <FileResultsList
+              data={fileResults}
+              query={query}
+              expandedTerms={expandedTerms}
+              onAskAboutFile={handleAskAboutFile}
+            />
           )}
 
           {activeTab === "files" &&
@@ -122,7 +147,12 @@ function App() {
             )}
 
           {activeTab === "content" && results.length > 0 && (
-            <ContentResultsList data={results} query={query} expandedTerms={expandedTerms} />
+            <ContentResultsList
+              data={results}
+              query={query}
+              expandedTerms={expandedTerms}
+              onAskAboutFile={handleAskAboutFile}
+            />
           )}
 
           {activeTab === "content" &&
@@ -134,7 +164,12 @@ function App() {
             )}
 
           {activeTab === "docs" && docResults.length > 0 && (
-            <DocResultsList data={docResults} query={query} expandedTerms={expandedTerms} />
+            <DocResultsList
+              data={docResults}
+              query={query}
+              expandedTerms={expandedTerms}
+              onAskAboutFile={handleAskAboutFile}
+            />
           )}
 
           {activeTab === "docs" &&
@@ -159,13 +194,15 @@ function App() {
       {/* Right side: Chat Panel */}
       <ChatPanel
         messages={messages}
-        isLoading={isChatLoading}
+        isLoading={isChatLoading || isReadingFile}
         error={chatError}
         onSendMessage={sendMessage}
         onClearChat={clearChat}
         searchContext={searchContext}
         isCollapsed={isChatCollapsed}
         onToggleCollapse={() => setIsChatCollapsed(!isChatCollapsed)}
+        focusedFile={focusedFile}
+        onClearFocusedFile={handleClearFocusedFile}
       />
 
       {/* Cloud folder warning dialog */}

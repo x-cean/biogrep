@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { getDefaultProvider, ChatMessage, ChatResponse } from "../lib/llm";
-import { SearchResult, FileResult, DocResult } from "../types";
+import { SearchResult, FileResult, DocResult, FocusedFile } from "../types";
 
 /**
  * Search context passed to the LLM for answering questions
@@ -10,6 +10,7 @@ export interface SearchContext {
     results: SearchResult[];
     fileResults: FileResult[];
     docResults: DocResult[];
+    focusedFile?: FocusedFile;
 }
 
 /**
@@ -30,52 +31,68 @@ export function useChat() {
      * Build context string from search results to pass to LLM
      */
     const buildContextString = useCallback((context?: SearchContext): string => {
-        if (!context || !context.query) {
+        if (!context) {
             return "";
         }
 
         const parts: string[] = [];
-        parts.push(`User searched for: "${context.query}"`);
 
-        // Add file results (top 10)
-        if (context.fileResults.length > 0) {
-            parts.push("\n📁 Files found:");
-            context.fileResults.slice(0, 10).forEach((f, i) => {
-                parts.push(`  ${i + 1}. ${f.path}`);
-            });
-            if (context.fileResults.length > 10) {
-                parts.push(`  ... and ${context.fileResults.length - 10} more files`);
+        // If a file is focused, include its full content first
+        if (context.focusedFile) {
+            const f = context.focusedFile;
+            parts.push(`📎 FOCUSED FILE: ${f.filename}`);
+            parts.push(`Path: ${f.path}`);
+            parts.push(`Type: ${f.isDocument ? 'Document' : 'Text file'}`);
+            if (f.truncated) {
+                parts.push(`⚠️ Note: File was truncated due to size limits`);
             }
+            parts.push(`\n--- File Content ---\n${f.content}\n--- End of File ---\n`);
         }
 
-        // Add content results (top 10 with snippets)
-        if (context.results.length > 0) {
-            parts.push("\n📝 Content matches:");
-            context.results.slice(0, 10).forEach((r, i) => {
-                // Truncate content to ~150 chars
-                const snippet = r.lineContent.length > 150
-                    ? r.lineContent.slice(0, 150) + "..."
-                    : r.lineContent;
-                parts.push(`  ${i + 1}. ${r.path}:${r.lineNumber}`);
-                parts.push(`     "${snippet}"`);
-            });
-            if (context.results.length > 10) {
-                parts.push(`  ... and ${context.results.length - 10} more matches`);
-            }
-        }
+        // Add search context if query exists
+        if (context.query) {
+            parts.push(`User searched for: "${context.query}"`);
 
-        // Add doc results (top 10)
-        if (context.docResults.length > 0) {
-            parts.push("\n📄 Document matches:");
-            context.docResults.slice(0, 10).forEach((d, i) => {
-                const snippet = d.lineContent.length > 150
-                    ? d.lineContent.slice(0, 150) + "..."
-                    : d.lineContent;
-                parts.push(`  ${i + 1}. ${d.path} (line ${d.lineNumber})`);
-                parts.push(`     "${snippet}"`);
-            });
-            if (context.docResults.length > 10) {
-                parts.push(`  ... and ${context.docResults.length - 10} more documents`);
+            // Add file results (top 10)
+            if (context.fileResults.length > 0) {
+                parts.push("\n📁 Files found:");
+                context.fileResults.slice(0, 10).forEach((f, i) => {
+                    parts.push(`  ${i + 1}. ${f.path}`);
+                });
+                if (context.fileResults.length > 10) {
+                    parts.push(`  ... and ${context.fileResults.length - 10} more files`);
+                }
+            }
+
+            // Add content results (top 10 with snippets)
+            if (context.results.length > 0) {
+                parts.push("\n📝 Content matches:");
+                context.results.slice(0, 10).forEach((r, i) => {
+                    // Truncate content to ~150 chars
+                    const snippet = r.lineContent.length > 150
+                        ? r.lineContent.slice(0, 150) + "..."
+                        : r.lineContent;
+                    parts.push(`  ${i + 1}. ${r.path}:${r.lineNumber}`);
+                    parts.push(`     "${snippet}"`);
+                });
+                if (context.results.length > 10) {
+                    parts.push(`  ... and ${context.results.length - 10} more matches`);
+                }
+            }
+
+            // Add doc results (top 10)
+            if (context.docResults.length > 0) {
+                parts.push("\n📄 Document matches:");
+                context.docResults.slice(0, 10).forEach((d, i) => {
+                    const snippet = d.lineContent.length > 150
+                        ? d.lineContent.slice(0, 150) + "..."
+                        : d.lineContent;
+                    parts.push(`  ${i + 1}. ${d.path} (line ${d.lineNumber})`);
+                    parts.push(`     "${snippet}"`);
+                });
+                if (context.docResults.length > 10) {
+                    parts.push(`  ... and ${context.docResults.length - 10} more documents`);
+                }
             }
         }
 

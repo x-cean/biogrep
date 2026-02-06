@@ -12,6 +12,7 @@
  * - Highlights matched terms in the results
  * - Opens the file when the primary column is clicked
  * - Shows the file path in the secondary column
+ * - Optionally shows an "Ask" button for chat context
  */
 import { openPath } from "@tauri-apps/plugin-opener";
 import { SearchResult, FileResult, DocResult } from "../types";
@@ -19,13 +20,32 @@ import { highlightText } from "../utils/highlightText";
 import { UnifiedResultList } from "./UnifiedResultList";
 import { CONFIG } from "../config";
 
+/**
+ * Ask button component for triggering file-aware chat
+ */
+function AskButton({ onClick }: { onClick: () => void }) {
+    return (
+        <button
+            onClick={(e) => {
+                e.stopPropagation();
+                onClick();
+            }}
+            className="px-2 py-0.5 text-xs bg-blue-600 hover:bg-blue-700 rounded text-white transition-colors"
+            title="Ask about this file"
+        >
+            💬
+        </button>
+    );
+}
+
 interface FileResultsListProps {
     data: FileResult[];
     query?: string;
     expandedTerms?: string[];
+    onAskAboutFile?: (path: string) => void;
 }
 
-export function FileResultsList({ data, query, expandedTerms = [] }: FileResultsListProps) {
+export function FileResultsList({ data, query, expandedTerms = [], onAskAboutFile }: FileResultsListProps) {
     const allTerms = query ? [query, ...expandedTerms] : expandedTerms;
 
     return (
@@ -41,6 +61,9 @@ export function FileResultsList({ data, query, expandedTerms = [] }: FileResults
             renderSecondaryContent={(r) => (
                 <span className="text-gray-500 truncate text-[10px]">{r.path}</span>
             )}
+            renderActions={onAskAboutFile ? (r) => (
+                <AskButton onClick={() => onAskAboutFile(r.path)} />
+            ) : undefined}
         />
     );
 }
@@ -49,9 +72,10 @@ interface ContentResultsListProps {
     data: SearchResult[];
     query: string;
     expandedTerms?: string[];
+    onAskAboutFile?: (path: string) => void;
 }
 
-export function ContentResultsList({ data, query, expandedTerms = [] }: ContentResultsListProps) {
+export function ContentResultsList({ data, query, expandedTerms = [], onAskAboutFile }: ContentResultsListProps) {
     const allTerms = [query, ...expandedTerms];
 
     return (
@@ -74,6 +98,9 @@ export function ContentResultsList({ data, query, expandedTerms = [] }: ContentR
                     </span>
                 </>
             )}
+            renderActions={onAskAboutFile ? (r) => (
+                <AskButton onClick={() => onAskAboutFile(r.path)} />
+            ) : undefined}
         />
     );
 }
@@ -82,9 +109,10 @@ interface DocResultsListProps {
     data: DocResult[];
     query: string;
     expandedTerms?: string[];
+    onAskAboutFile?: (path: string) => void;
 }
 
-export function DocResultsList({ data, query, expandedTerms = [] }: DocResultsListProps) {
+export function DocResultsList({ data, query, expandedTerms = [], onAskAboutFile }: DocResultsListProps) {
     const allTerms = [query, ...expandedTerms];
 
     return (
@@ -109,7 +137,9 @@ export function DocResultsList({ data, query, expandedTerms = [] }: DocResultsLi
                     </span>
                 </>
             )}
+            renderActions={onAskAboutFile ? (r) => (
+                <AskButton onClick={() => onAskAboutFile(r.path)} />
+            ) : undefined}
         />
     );
 }
-
