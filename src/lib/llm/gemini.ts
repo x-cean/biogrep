@@ -3,17 +3,17 @@ import { LLMProvider, LLMConfig, ChatMessage, ChatOptions, ChatResponse } from "
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODEL = "gemini-2.5-flash";
 
-const EXPANSION_PROMPT = `You are a file search assistant. Given a search query, generate 5 alternative search terms that might find related files or content.
+const EXPANSION_PROMPT = `You are a file search assistant. Given a search query, generate exactly 5 alternative search terms that might find related files or content.
 
 Rules:
-- Return ONLY the terms, one per line
-- No numbering, no explanations
+- Return EXACTLY 5 terms, one per line
+- No numbering, no explanations, no extra text
 - Focus on: synonyms, abbreviations, related concepts
-- Try to match the style of the query
+- Each term should be 1-3 words maximum
 
 Query: "{query}"
 
-Alternative terms:`;
+5 alternative terms:`;
 
 const DEFAULT_SYSTEM_PROMPT = `You are a helpful research assistant embedded in a file search tool called BioGrep. 
 You help users understand and navigate their files and documents.
@@ -54,7 +54,7 @@ export class GeminiProvider implements LLMProvider {
                         contents: [{ parts: [{ text: prompt }] }],
                         generationConfig: {
                             temperature: 0.3,
-                            maxOutputTokens: 100,
+                            maxOutputTokens: 200,
                         },
                     }),
                 }
