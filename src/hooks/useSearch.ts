@@ -37,6 +37,9 @@ export function useSearch() {
     const fileResultsRef = useRef<FileResult[]>([]);
     const docResultsRef = useRef<DocResult[]>([]);
 
+    // Guard to prevent duplicate expansion calls (React may call setState callbacks multiple times)
+    const expansionTriggeredRef = useRef(false);
+
     // ============ UI STATE ============
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -107,6 +110,7 @@ export function useSearch() {
             resultsRef.current = [];
             fileResultsRef.current = [];
             docResultsRef.current = [];
+            expansionTriggeredRef.current = false;  // Reset expansion guard
             resetExpansion();
 
             try {
@@ -156,24 +160,45 @@ export function useSearch() {
                 ]);
 
                 // Check for sparse results and trigger expansion
-                // Use refs to read counts directly (avoids calling async code inside setState)
+                // Use nested setState to get accurate result counts
+                // Guard with expansionTriggeredRef to prevent duplicate LLM calls
                 if (getSearchId() === currentSearchId) {
-                    const totalResults =
-                        resultsRef.current.length +
-                        fileResultsRef.current.length +
-                        docResultsRef.current.length;
+                    setResults((currentResults) => {
+                        setFileResults((currentFileResults) => {
+                            setDocResults((currentDocResults) => {
+                                const totalResults =
+                                    currentResults.length +
+                                    currentFileResults.length +
+                                    currentDocResults.length;
 
-                    // Trigger expansion (async but called outside setState)
-                    checkAndExpand(
-                        currentSearchId,
-                        query,
-                        searchPath,
-                        totalResults,
-                        wrappedSetFileResults,
-                        wrappedSetResults,
-                        wrappedSetDocResults,
-                        setError
-                    );
+                                console.log("[Search] Checking expansion - totalResults:", totalResults,
+                                    "guard:", expansionTriggeredRef.current);
+
+                                // Only trigger if not already triggered for this search
+                                if (!expansionTriggeredRef.current) {
+                                    expansionTriggeredRef.current = true;
+
+                                    // Use setTimeout to escape the setState callback
+                                    setTimeout(() => {
+                                        checkAndExpand(
+                                            currentSearchId,
+                                            query,
+                                            searchPath,
+                                            totalResults,
+                                            setFileResults,
+                                            setResults,
+                                            setDocResults,
+                                            setError
+                                        );
+                                    }, 0);
+                                }
+
+                                return currentDocResults;
+                            });
+                            return currentFileResults;
+                        });
+                        return currentResults;
+                    });
                 }
             } catch (err) {
                 if (getSearchId() === currentSearchId) {
