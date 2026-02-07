@@ -51,11 +51,11 @@ impl VectorStore {
             [],
         )?;
 
-        // Create virtual table for vector storage (384 dimensions for gte-small)
+        // Create virtual table for vector storage (768 dimensions for Gemini text-embedding-004)
         conn.execute(
             "CREATE VIRTUAL TABLE IF NOT EXISTS document_vectors USING vec0(
                 id INTEGER PRIMARY KEY,
-                embedding float[384]
+                embedding float[768]
             )",
             [],
         )?;

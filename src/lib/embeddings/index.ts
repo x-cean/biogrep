@@ -1,1 +1,1 @@
-export { LocalEmbedder, getEmbedder } from "./LocalEmbedder";
+export { GeminiEmbedder, getEmbedder } from "./GeminiEmbedder";
