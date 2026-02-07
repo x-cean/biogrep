@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { Command } from "@tauri-apps/plugin-shell";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 import { getEmbedder } from "../lib/embeddings";
 import { getVectorStore } from "../lib/vectorstore";
@@ -113,11 +113,33 @@ export function useIndexer() {
             const embedder = getEmbedder();
             setProgress({ phase: "scanning", current: 0, total: 0 });
 
-            // Use fd to list text files in the folder
-            const fdOutput: string = await invoke("run_fd", {
-                pattern: "",
-                path: folderPath,
-                fileType: "file",
+            // Use fd sidecar to list all files in the folder
+            const fdOutput = await new Promise<string>((resolve, reject) => {
+                const command = Command.sidecar("binaries/fd", [
+                    ".",           // Match all files
+                    folderPath,
+                    "--type", "f", // Only files
+                ]);
+
+                let output = "";
+
+                command.stdout.on("data", (data) => {
+                    output += data;
+                });
+
+                command.on("close", (data) => {
+                    if (data.code === 0) {
+                        resolve(output);
+                    } else {
+                        reject(new Error(`fd exited with code ${data.code}`));
+                    }
+                });
+
+                command.on("error", (err) => {
+                    reject(err);
+                });
+
+                command.spawn().catch(reject);
             });
 
             const files = fdOutput
