@@ -1,8 +1,9 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSearch } from "./hooks/useSearch";
 import { useChat, SearchContext } from "./hooks/useChat";
 import { useFileReader } from "./hooks/useFileReader";
 import { useCloudFolderDetection } from "./hooks/useCloudFolderDetection";
+import { useIndexer } from "./hooks/useIndexer";
 import { SearchBar } from "./components/SearchBar";
 import { TabBar } from "./components/TabBar";
 import { CloudWarningDialog } from "./components/CloudWarningDialog";
@@ -27,14 +28,32 @@ function App() {
     stopSearch,
   } = useSearch();
 
-  // Chat state
+  // Indexer for RAG knowledge base
+  const {
+    indexFolder,
+    cancelIndexing,
+    loadChunkCount,
+    isIndexing,
+    progress,
+    indexedChunks,
+  } = useIndexer();
+
+  // Load chunk count on mount
+  useEffect(() => {
+    loadChunkCount();
+  }, [loadChunkCount]);
+
+  // Enable RAG when knowledge base has indexed chunks
+  const isRAGEnabled = indexedChunks > 0;
+
+  // Chat state - enable RAG if we have indexed chunks
   const {
     messages,
     isLoading: isChatLoading,
     error: chatError,
     sendMessage,
     clearChat
-  } = useChat();
+  } = useChat({ enableRAG: isRAGEnabled });
   const [isChatCollapsed, setIsChatCollapsed] = useState(true);
 
   // File reader for focused file
@@ -119,6 +138,55 @@ function App() {
           error={error}
           stopSearch={stopSearch}
         />
+
+        {/* Indexing Controls */}
+        <div className="px-4 py-2 border-b border-gray-800 flex items-center gap-3 text-xs">
+          <button
+            onClick={() => searchPath && indexFolder(searchPath)}
+            disabled={isIndexing || !searchPath}
+            className={`px-3 py-1.5 rounded transition-colors ${isIndexing
+                ? "bg-yellow-600 cursor-wait"
+                : searchPath
+                  ? "bg-blue-600 hover:bg-blue-500"
+                  : "bg-gray-700 cursor-not-allowed"
+              }`}
+          >
+            {isIndexing ? "Indexing..." : "📚 Index Folder"}
+          </button>
+
+          {isIndexing && (
+            <button
+              onClick={cancelIndexing}
+              className="px-2 py-1 bg-red-600 hover:bg-red-500 rounded text-xs"
+            >
+              Cancel
+            </button>
+          )}
+
+          {isIndexing && (
+            <span className="text-yellow-400">
+              {progress.phase}: {progress.current}/{progress.total}
+              {progress.currentFile && (
+                <span className="text-gray-500 ml-2 truncate max-w-xs inline-block align-bottom">
+                  {progress.currentFile.split("/").pop()}
+                </span>
+              )}
+            </span>
+          )}
+
+          {!isIndexing && indexedChunks > 0 && (
+            <span className="text-green-400">
+              📚 {indexedChunks} chunks indexed • RAG enabled
+            </span>
+          )}
+
+          {!isIndexing && indexedChunks === 0 && (
+            <span className="text-gray-500">
+              No knowledge base — index a folder to enable RAG
+            </span>
+          )}
+        </div>
+
 
         <TabBar
           activeTab={activeTab}

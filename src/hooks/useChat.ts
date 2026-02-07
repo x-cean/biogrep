@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { getDefaultProvider, ChatMessage, ChatResponse } from "../lib/llm";
 import { SearchResult, FileResult, DocResult, FocusedFile } from "../types";
+import { useRAGSearch } from "./useRAGSearch";
 
 /**
  * Search context passed to the LLM for answering questions
@@ -14,28 +15,47 @@ export interface SearchContext {
 }
 
 /**
+ * Options for useChat hook
+ */
+export interface UseChatOptions {
+    enableRAG?: boolean;  // Whether to auto-retrieve from knowledge base
+}
+
+/**
  * useChat Hook - Manages chat conversation state with LLM
  * 
  * Provides:
  * - Message history management
  * - Sending messages with search context
+ * - RAG-enhanced responses (when enableRAG is true)
  * - Loading and error states
  * - Conversation clearing
  */
-export function useChat() {
+export function useChat(options: UseChatOptions = {}) {
+    const { enableRAG = false } = options;
+
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // RAG search hook for knowledge base retrieval
+    const ragSearch = useRAGSearch();
+
     /**
      * Build context string from search results to pass to LLM
      */
-    const buildContextString = useCallback((context?: SearchContext): string => {
-        if (!context) {
-            return "";
+    const buildContextString = useCallback((context?: SearchContext, ragContext?: string): string => {
+        const parts: string[] = [];
+
+        // Add RAG context first if available
+        if (ragContext) {
+            parts.push(ragContext);
+            parts.push(""); // Empty line separator
         }
 
-        const parts: string[] = [];
+        if (!context) {
+            return parts.join("\n");
+        }
 
         // If a file is focused, include its full content first
         if (context.focusedFile) {
@@ -125,8 +145,19 @@ export function useChat() {
                 return;
             }
 
-            // Build context string from search results
-            const contextString = buildContextString(context);
+            // If RAG is enabled, search the knowledge base first
+            let ragContext = "";
+            if (enableRAG) {
+                console.log("[Chat] RAG enabled, searching knowledge base...");
+                const ragResults = await ragSearch.search(content, { vectorLimit: 5 });
+                if (ragResults.length > 0) {
+                    ragContext = ragSearch.formatContext(ragResults);
+                    console.log(`[Chat] Found ${ragResults.length} relevant chunks from knowledge base`);
+                }
+            }
+
+            // Build context string from search results + RAG
+            const contextString = buildContextString(context, ragContext);
 
             const response: ChatResponse = await provider.chat(updatedMessages, {
                 context: contextString || undefined,
@@ -148,7 +179,7 @@ export function useChat() {
         } finally {
             setIsLoading(false);
         }
-    }, [messages, buildContextString]);
+    }, [messages, buildContextString, enableRAG, ragSearch]);
 
     /**
      * Clear the conversation history
@@ -166,3 +197,4 @@ export function useChat() {
         clearChat,
     };
 }
+

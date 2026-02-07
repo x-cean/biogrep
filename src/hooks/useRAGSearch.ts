@@ -1,0 +1,131 @@
+import { useCallback } from "react";
+import { getEmbedder } from "../lib/embeddings";
+import { getVectorStore, VectorSearchResult } from "../lib/vectorstore";
+
+/**
+ * Combined RAG search result (from vector or keyword search)
+ */
+export interface RAGResult {
+    path: string;
+    content: string;
+    chunkIndex: number;
+    score: number;
+    source: "vector" | "keyword";
+}
+
+/**
+ * useRAGSearch Hook - Combines vector and keyword search for RAG
+ * 
+ * Provides:
+ * - Semantic search via vector embeddings
+ * - Integration point for keyword search merging
+ * - Score normalization and deduplication
+ */
+export function useRAGSearch() {
+    /**
+     * Search the vector store using semantic similarity
+     */
+    const searchVectors = useCallback(async (
+        query: string,
+        limit: number = 5
+    ): Promise<RAGResult[]> => {
+        try {
+            const embedder = getEmbedder();
+            const vectorStore = getVectorStore();
+
+            // Initialize if needed
+            await vectorStore.init();
+
+            // Embed the query
+            const queryEmbedding = await embedder.embed(query);
+
+            // Search vector store
+            const results: VectorSearchResult[] = await vectorStore.search(queryEmbedding, limit);
+
+            // Convert to RAGResult format
+            // Lower distance = more similar, so we invert for score
+            return results.map((r) => ({
+                path: r.path,
+                content: r.content,
+                chunkIndex: r.chunk_index,
+                score: 1 / (1 + r.distance), // Normalize distance to 0-1 score
+                source: "vector" as const,
+            }));
+        } catch (err) {
+            console.error("[RAGSearch] Vector search failed:", err);
+            return [];
+        }
+    }, []);
+
+    /**
+     * Merge and deduplicate results from multiple sources
+     * Keeps the highest-scoring entry for each unique path+chunk
+     */
+    const mergeResults = useCallback((
+        ...resultSets: RAGResult[][]
+    ): RAGResult[] => {
+        const merged = new Map<string, RAGResult>();
+
+        for (const results of resultSets) {
+            for (const result of results) {
+                const key = `${result.path}:${result.chunkIndex}`;
+                const existing = merged.get(key);
+
+                if (!existing || result.score > existing.score) {
+                    merged.set(key, result);
+                }
+            }
+        }
+
+        // Sort by score descending
+        return Array.from(merged.values()).sort((a, b) => b.score - a.score);
+    }, []);
+
+    /**
+     * Perform hybrid search (vector + optional keyword results)
+     * For proof-of-concept, primarily uses vector search
+     */
+    const search = useCallback(async (
+        query: string,
+        options: { vectorLimit?: number; keywordResults?: RAGResult[] } = {}
+    ): Promise<RAGResult[]> => {
+        const { vectorLimit = 5, keywordResults = [] } = options;
+
+        // Get vector search results
+        const vectorResults = await searchVectors(query, vectorLimit);
+
+        // Merge with any keyword results passed in
+        const merged = mergeResults(vectorResults, keywordResults);
+
+        console.log(`[RAGSearch] Found ${vectorResults.length} vector + ${keywordResults.length} keyword = ${merged.length} merged results`);
+
+        return merged;
+    }, [searchVectors, mergeResults]);
+
+    /**
+     * Format RAG results as context string for LLM
+     */
+    const formatContext = useCallback((results: RAGResult[]): string => {
+        if (results.length === 0) return "";
+
+        const parts = ["📚 Knowledge Base Context:"];
+
+        results.forEach((r, i) => {
+            const filename = r.path.split("/").pop() || r.path;
+            const snippet = r.content.length > 300
+                ? r.content.slice(0, 300) + "..."
+                : r.content;
+            parts.push(`\n[${i + 1}] ${filename} (${r.source}):`);
+            parts.push(snippet);
+        });
+
+        return parts.join("\n");
+    }, []);
+
+    return {
+        search,
+        searchVectors,
+        mergeResults,
+        formatContext,
+    };
+}
