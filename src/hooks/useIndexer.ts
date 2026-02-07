@@ -96,6 +96,8 @@ export function useIndexer() {
      * Index a folder: scan, read, chunk, embed, store
      */
     const indexFolder = useCallback(async (folderPath: string): Promise<void> => {
+        console.log("[Indexer] Starting indexFolder for:", folderPath);
+
         if (isIndexing) {
             console.warn("[Indexer] Already indexing");
             return;
@@ -106,11 +108,15 @@ export function useIndexer() {
 
         try {
             // Initialize vector store
+            console.log("[Indexer] Initializing vector store...");
             const vectorStore = getVectorStore();
             await vectorStore.init();
+            console.log("[Indexer] Vector store initialized");
 
-            // Initialize embedder (this loads the model if needed)
+            // Initialize embedder
+            console.log("[Indexer] Getting embedder...");
             const embedder = getEmbedder();
+            console.log("[Indexer] Embedder ready, configured:", embedder.isConfigured());
             setProgress({ phase: "scanning", current: 0, total: 0 });
 
             // Use fd sidecar to list all files in the folder
@@ -181,6 +187,7 @@ export function useIndexer() {
                     // Chunk the content
                     setProgress((p) => ({ ...p, phase: "chunking" }));
                     const chunks = chunkText(content);
+                    console.log(`[Indexer] File ${i + 1}/${files.length}: ${filePath.split("/").pop()} - ${chunks.length} chunks`);
 
                     // Embed and store each chunk
                     for (const chunk of chunks) {
@@ -194,6 +201,7 @@ export function useIndexer() {
 
                         // Generate embedding
                         const embedding = await embedder.embed(chunk.content);
+                        console.log(`[Indexer] Embedded chunk ${chunk.index + 1}/${chunks.length}, dim=${embedding.length}`);
 
                         // Store in vector database
                         setProgress((p) => ({ ...p, phase: "storing" }));
@@ -203,6 +211,7 @@ export function useIndexer() {
                             chunk.content,
                             embedding
                         );
+                        console.log(`[Indexer] Stored chunk ${chunk.index + 1}/${chunks.length}`);
 
                         totalChunks++;
                     }
