@@ -20,10 +20,11 @@
     - [x] **Implement Virtualized List:** Use `react-virtuoso` to render only visible results (crucial for 50k+ hits).
     - [x] Add a "Stop/Cancel" button in the UI.
 
-- [ ] **Phase 4: "Science" Logic (The Differentiator)**
-    - [ ] **File Type Detection:** Logic to detect extension (e.g., .fasta) vs content-type.
-    - [ ] **Basic Previewer:** Component to display text content with search terms highlighted.
-    - [ ] **Simple PDF Support:** Attempt to use a Rust crate (e.g., `pdf-extract`) for text previews before trying full `rga` integration.
+- [ ] **Phase 4: Agentic Knowledge Base (The Pivot)**
+    - [ ] **State Management Refactor:** Move global state to Context API (`SearchContext`, `ChatContext`) to prepare for complex agent logic.
+    - [ ] **Tool-Use Layer:** Expose `rg`, `fd`, and `read_file` as callable tools for the LLM.
+    - [ ] **Agent Loop:** Implement a "ReAct" loop where the LLM can plan -> search -> read -> answer.
+    - [ ] **UI for Thinking:** Update Chat UI to show the agent's "Thought Process" (tools being called).
 
 - [ ] **Phase 5: Polish & Edge Cases**
     - [ ] **Test Edge Cases:** Handle empty queries, invalid paths, permission errors, very large result sets, special characters in search.
