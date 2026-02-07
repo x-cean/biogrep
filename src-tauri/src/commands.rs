@@ -83,3 +83,12 @@ pub fn get_chunk_count(state: State<VectorStoreState>) -> Result<i64, String> {
 
     store.chunk_count().map_err(|e| e.to_string())
 }
+
+/// Clear all indexed data
+#[tauri::command]
+pub fn clear_all_chunks(state: State<VectorStoreState>) -> Result<usize, String> {
+    let guard = state.0.lock().unwrap();
+    let store = guard.as_ref().ok_or("Vector store not initialized")?;
+
+    store.clear_all().map_err(|e| e.to_string())
+}

@@ -120,6 +120,7 @@ export function useIndexer() {
             setProgress({ phase: "scanning", current: 0, total: 0 });
 
             // Use fd sidecar to list all files in the folder
+            console.log("[Indexer] Starting fd scan for:", folderPath);
             const fdOutput = await new Promise<string>((resolve, reject) => {
                 const command = Command.sidecar("binaries/fd", [
                     ".",           // Match all files
@@ -131,9 +132,15 @@ export function useIndexer() {
 
                 command.stdout.on("data", (data) => {
                     output += data;
+                    console.log("[Indexer] fd stdout received:", data.length, "chars");
+                });
+
+                command.stderr.on("data", (data) => {
+                    console.error("[Indexer] fd stderr:", data);
                 });
 
                 command.on("close", (data) => {
+                    console.log("[Indexer] fd closed with code:", data.code);
                     if (data.code === 0) {
                         resolve(output);
                     } else {
@@ -142,10 +149,16 @@ export function useIndexer() {
                 });
 
                 command.on("error", (err) => {
+                    console.error("[Indexer] fd error event:", err);
                     reject(err);
                 });
 
-                command.spawn().catch(reject);
+                command.spawn()
+                    .then(() => console.log("[Indexer] fd spawned successfully"))
+                    .catch((err) => {
+                        console.error("[Indexer] fd spawn failed:", err);
+                        reject(err);
+                    });
             });
 
             const files = fdOutput
@@ -260,10 +273,26 @@ export function useIndexer() {
         }
     }, []);
 
+    /**
+     * Clear all indexed data
+     */
+    const clearIndex = useCallback(async () => {
+        try {
+            const vectorStore = getVectorStore();
+            await vectorStore.init();
+            await vectorStore.clearAll();
+            setIndexedChunks(0);
+            console.log("[Indexer] Index cleared");
+        } catch (err) {
+            console.error("[Indexer] Failed to clear index:", err);
+        }
+    }, []);
+
     return {
         indexFolder,
         cancelIndexing,
         loadChunkCount,
+        clearIndex,
         isIndexing,
         progress,
         indexedChunks,

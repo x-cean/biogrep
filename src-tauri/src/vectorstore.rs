@@ -169,6 +169,15 @@ impl VectorStore {
         self.conn
             .query_row("SELECT COUNT(*) FROM documents", [], |row| row.get(0))
     }
+
+    /// Clear all indexed data
+    pub fn clear_all(&self) -> Result<usize, rusqlite::Error> {
+        // Delete all vectors
+        self.conn.execute("DELETE FROM document_vectors", [])?;
+        // Delete all documents
+        let deleted = self.conn.execute("DELETE FROM documents", [])?;
+        Ok(deleted)
+    }
 }
 
 /// Thread-safe wrapper for VectorStore state

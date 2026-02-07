@@ -20,6 +20,7 @@ pub fn run() {
             commands::delete_indexed_path,
             commands::is_path_indexed,
             commands::get_chunk_count,
+            commands::clear_all_chunks,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

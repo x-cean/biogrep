@@ -86,6 +86,16 @@ export class VectorStoreClient {
         return invoke<number>("get_chunk_count");
     }
 
+    /**
+     * Clear all indexed data
+     */
+    async clearAll(): Promise<number> {
+        this.ensureInitialized();
+        const deleted = await invoke<number>("clear_all_chunks");
+        console.log(`[VectorStore] Cleared ${deleted} chunks`);
+        return deleted;
+    }
+
     private ensureInitialized(): void {
         if (!this.initialized) {
             throw new Error("VectorStore not initialized. Call init() first.");

@@ -33,6 +33,7 @@ function App() {
     indexFolder,
     cancelIndexing,
     loadChunkCount,
+    clearIndex,
     isIndexing,
     progress,
     indexedChunks,
@@ -145,10 +146,10 @@ function App() {
             onClick={() => searchPath && indexFolder(searchPath)}
             disabled={isIndexing || !searchPath}
             className={`px-3 py-1.5 rounded transition-colors ${isIndexing
-                ? "bg-yellow-600 cursor-wait"
-                : searchPath
-                  ? "bg-blue-600 hover:bg-blue-500"
-                  : "bg-gray-700 cursor-not-allowed"
+              ? "bg-yellow-600 cursor-wait"
+              : searchPath
+                ? "bg-blue-600 hover:bg-blue-500"
+                : "bg-gray-700 cursor-not-allowed"
               }`}
           >
             {isIndexing ? "Indexing..." : "📚 Index Folder"}
@@ -175,9 +176,18 @@ function App() {
           )}
 
           {!isIndexing && indexedChunks > 0 && (
-            <span className="text-green-400">
-              📚 {indexedChunks} chunks indexed • RAG enabled
-            </span>
+            <>
+              <span className="text-green-400">
+                📚 {indexedChunks} chunks indexed • RAG enabled
+              </span>
+              <button
+                onClick={clearIndex}
+                className="px-2 py-1 bg-gray-700 hover:bg-red-600 rounded text-xs transition-colors"
+                title="Clear all indexed data"
+              >
+                🗑️ Clear
+              </button>
+            </>
           )}
 
           {!isIndexing && indexedChunks === 0 && (
