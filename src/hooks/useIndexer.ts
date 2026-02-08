@@ -95,9 +95,13 @@ export function useIndexer() {
             }
 
             // Move start forward, accounting for overlap
-            start = chunkEnd - overlapChars;
-            if (start <= chunks[chunks.length - 1]?.index || start >= text.length) {
+            // Ensure we always make forward progress to prevent infinite loop
+            const nextStart = chunkEnd - overlapChars;
+            if (nextStart <= start) {
+                // Overlap is larger than chunk, just move to end
                 start = chunkEnd;
+            } else {
+                start = nextStart;
             }
         }
 
