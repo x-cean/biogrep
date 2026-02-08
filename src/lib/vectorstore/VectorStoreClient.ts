@@ -13,24 +13,44 @@ export interface VectorSearchResult {
 
 /**
  * VectorStore client - TypeScript bindings for Rust vector store commands
+ * 
+ * Each embedder model gets its own database file to prevent dimension mismatch.
  */
 export class VectorStoreClient {
     private initialized = false;
     private dbPath: string | null = null;
+    private currentModelId: string | null = null;
 
     /**
-     * Initialize the vector store. Must be called before any other operations.
+     * Initialize the vector store for a specific embedding model.
+     * @param modelId - Unique identifier for the embedding model (used in DB filename)
+     * @param dimension - Dimension of the embedding vectors
      * @returns Path to the database file
      */
-    async init(): Promise<string> {
-        if (this.initialized) {
+    async init(modelId: string, dimension: number): Promise<string> {
+        // If already initialized with same model, return cached path
+        if (this.initialized && this.currentModelId === modelId) {
             return this.dbPath!;
         }
 
-        this.dbPath = await invoke<string>("init_vectorstore");
+        // Re-initialize if model changed
+        if (this.initialized && this.currentModelId !== modelId) {
+            console.log(`[VectorStore] Model changed from ${this.currentModelId} to ${modelId}, reinitializing`);
+            this.initialized = false;
+        }
+
+        this.dbPath = await invoke<string>("init_vectorstore", { modelId, dimension });
+        this.currentModelId = modelId;
         this.initialized = true;
-        console.log("[VectorStore] Initialized at:", this.dbPath);
+        console.log(`[VectorStore] Initialized for model "${modelId}" (${dimension}d) at:`, this.dbPath);
         return this.dbPath;
+    }
+
+    /**
+     * Get the current model ID this store is initialized for
+     */
+    getModelId(): string | null {
+        return this.currentModelId;
     }
 
     /**
@@ -98,7 +118,7 @@ export class VectorStoreClient {
 
     private ensureInitialized(): void {
         if (!this.initialized) {
-            throw new Error("VectorStore not initialized. Call init() first.");
+            throw new Error("VectorStore not initialized. Call init(modelId, dimension) first.");
         }
     }
 }

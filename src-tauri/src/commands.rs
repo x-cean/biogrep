@@ -1,23 +1,30 @@
 use crate::vectorstore::{VectorSearchResult, VectorStoreState};
 use tauri::{Manager, State};
 
-/// Initialize the vector store with the app data directory
+/// Initialize the vector store with model-specific database
+/// Each embedding model gets its own database file to prevent dimension conflicts
 #[tauri::command]
 pub fn init_vectorstore(
     app_handle: tauri::AppHandle,
     state: State<VectorStoreState>,
+    model_id: String,
+    dimension: i32,
 ) -> Result<String, String> {
     let app_data_dir = app_handle
         .path()
         .app_data_dir()
         .map_err(|e: tauri::Error| e.to_string())?;
 
-    let db_path = app_data_dir.join("biogrep_vectors.db");
+    // Create model-specific database filename
+    // Sanitize model_id to be filesystem-safe
+    let safe_model_id = model_id.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+    let db_path = app_data_dir.join(format!("biogrep_vectors_{}.db", safe_model_id));
 
     // Ensure directory exists
     std::fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
 
-    let store = crate::vectorstore::VectorStore::new(&db_path).map_err(|e| e.to_string())?;
+    let store =
+        crate::vectorstore::VectorStore::new(&db_path, dimension).map_err(|e| e.to_string())?;
 
     let mut guard = state.0.lock().unwrap();
     *guard = Some(store);

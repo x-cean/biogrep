@@ -107,16 +107,17 @@ export function useIndexer() {
         abortRef.current = false;
 
         try {
-            // Initialize vector store
-            console.log("[Indexer] Initializing vector store...");
-            const vectorStore = getVectorStore();
-            await vectorStore.init();
-            console.log("[Indexer] Vector store initialized");
-
-            // Initialize embedder
+            // Initialize embedder first (needed for config)
             console.log("[Indexer] Getting embedder...");
             const embedder = getEmbedder();
-            console.log("[Indexer] Embedder ready, configured:", embedder.isConfigured());
+            console.log("[Indexer] Embedder ready:", embedder.config.name, "configured:", embedder.isConfigured());
+
+            // Initialize vector store with embedder config
+            console.log("[Indexer] Initializing vector store...");
+            const vectorStore = getVectorStore();
+            await vectorStore.init(embedder.config.id, embedder.config.dimension);
+            console.log("[Indexer] Vector store initialized for model:", embedder.config.id);
+
             setProgress({ phase: "scanning", current: 0, total: 0 });
 
             // Use fd sidecar to list all files in the folder
@@ -264,8 +265,9 @@ export function useIndexer() {
      */
     const loadChunkCount = useCallback(async () => {
         try {
+            const embedder = getEmbedder();
             const vectorStore = getVectorStore();
-            await vectorStore.init();
+            await vectorStore.init(embedder.config.id, embedder.config.dimension);
             const count = await vectorStore.getChunkCount();
             setIndexedChunks(count);
         } catch (err) {
@@ -278,8 +280,9 @@ export function useIndexer() {
      */
     const clearIndex = useCallback(async () => {
         try {
+            const embedder = getEmbedder();
             const vectorStore = getVectorStore();
-            await vectorStore.init();
+            await vectorStore.init(embedder.config.id, embedder.config.dimension);
             await vectorStore.clearAll();
             setIndexedChunks(0);
             console.log("[Indexer] Index cleared");

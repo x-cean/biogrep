@@ -29,8 +29,8 @@ pub struct VectorStore {
 }
 
 impl VectorStore {
-    /// Initialize a new vector store at the given path
-    pub fn new(db_path: &Path) -> Result<Self, rusqlite::Error> {
+    /// Initialize a new vector store at the given path with specified embedding dimension
+    pub fn new(db_path: &Path, dimension: i32) -> Result<Self, rusqlite::Error> {
         let conn = Connection::open(db_path)?;
 
         // Load the sqlite-vec extension using the auto-load feature
@@ -51,12 +51,16 @@ impl VectorStore {
             [],
         )?;
 
-        // Create virtual table for vector storage (3072 dimensions for Gemini gemini-embedding-001)
+        // Create virtual table for vector storage with dynamic dimension
+        // Note: dimension is validated by the caller (frontend knows the correct dimension)
         conn.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS document_vectors USING vec0(
-                id INTEGER PRIMARY KEY,
-                embedding float[3072]
-            )",
+            &format!(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS document_vectors USING vec0(
+                    id INTEGER PRIMARY KEY,
+                    embedding float[{}]
+                )",
+                dimension
+            ),
             [],
         )?;
 

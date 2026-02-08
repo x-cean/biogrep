@@ -1,14 +1,22 @@
 /**
  * GeminiEmbedder - Generates embeddings using Gemini API
  * 
- * Uses the gemini-embedding-001 model which produces 768-dimensional embeddings.
+ * Uses the gemini-embedding-001 model which produces 3072-dimensional embeddings.
  * Falls back to a simpler approach if API is not configured.
  */
 
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-const EMBEDDING_MODEL = "gemini-embedding-001";  // text-embedding-004 is deprecated
+import { Embedder, EmbedderConfig } from "./types";
 
-export class GeminiEmbedder {
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+const EMBEDDING_MODEL = "gemini-embedding-001";
+
+export class GeminiEmbedder implements Embedder {
+    readonly config: EmbedderConfig = {
+        id: EMBEDDING_MODEL,
+        dimension: 3072,
+        name: "Gemini",
+    };
+
     private apiKey: string;
 
     constructor() {

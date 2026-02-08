@@ -33,8 +33,8 @@ export function useRAGSearch() {
             const embedder = getEmbedder();
             const vectorStore = getVectorStore();
 
-            // Initialize if needed
-            await vectorStore.init();
+            // Initialize if needed (with embedder config for model-specific DB)
+            await vectorStore.init(embedder.config.id, embedder.config.dimension);
 
             // Embed the query
             const queryEmbedding = await embedder.embed(query);

@@ -1,8 +1,11 @@
 import { pipeline, env } from "@xenova/transformers";
+import { Embedder, EmbedderConfig } from "./types";
 
 // Configure transformers.js to use local cache
 env.allowLocalModels = true;
 env.useBrowserCache = true;
+
+const MODEL_NAME = "Supabase/gte-small";
 
 /**
  * LocalEmbedder - Generates embeddings using a local ONNX model
@@ -10,11 +13,16 @@ env.useBrowserCache = true;
  * Uses the gte-small model (~30MB) which produces 384-dimensional embeddings.
  * The model is downloaded on first use and cached locally.
  */
-export class LocalEmbedder {
+export class LocalEmbedder implements Embedder {
+    readonly config: EmbedderConfig = {
+        id: "gte-small",
+        dimension: 384,
+        name: "Local (gte-small)",
+    };
+
     // Using 'any' due to complex transformers.js pipeline types
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private embedder: any = null;
-    private modelName = "Supabase/gte-small";
     private isLoading = false;
     private loadPromise: Promise<void> | null = null;
 
@@ -31,12 +39,12 @@ export class LocalEmbedder {
         }
 
         this.isLoading = true;
-        console.log("[LocalEmbedder] Loading model:", this.modelName);
+        console.log("[LocalEmbedder] Loading model:", MODEL_NAME);
 
         this.loadPromise = (async () => {
             try {
                 // Use feature-extraction pipeline for embeddings
-                this.embedder = await pipeline("feature-extraction", this.modelName, {
+                this.embedder = await pipeline("feature-extraction", MODEL_NAME, {
                     quantized: true, // Use quantized model for faster inference
                 });
                 console.log("[LocalEmbedder] Model loaded successfully");
@@ -84,6 +92,13 @@ export class LocalEmbedder {
         }
 
         return embeddings;
+    }
+
+    /**
+     * LocalEmbedder is always configured (no API key needed)
+     */
+    isConfigured(): boolean {
+        return true;
     }
 
     /**
