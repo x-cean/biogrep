@@ -51,11 +51,11 @@ impl VectorStore {
             [],
         )?;
 
-        // Create virtual table for vector storage (768 dimensions for Gemini text-embedding-004)
+        // Create virtual table for vector storage (3072 dimensions for Gemini gemini-embedding-001)
         conn.execute(
             "CREATE VIRTUAL TABLE IF NOT EXISTS document_vectors USING vec0(
                 id INTEGER PRIMARY KEY,
-                embedding float[768]
+                embedding float[3072]
             )",
             [],
         )?;
@@ -111,9 +111,8 @@ impl VectorStore {
                 v.distance
             FROM document_vectors v
             INNER JOIN documents d ON d.id = v.id
-            WHERE v.embedding MATCH ?1
-            ORDER BY v.distance
-            LIMIT ?2",
+            WHERE v.embedding MATCH ?1 AND k = ?2
+            ORDER BY v.distance",
         )?;
 
         let results = stmt.query_map(params![embedding_blob, limit as i64], |row| {

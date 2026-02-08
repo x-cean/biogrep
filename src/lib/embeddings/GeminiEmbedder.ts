@@ -72,9 +72,9 @@ export class GeminiEmbedder {
      * This is NOT semantic, just for testing when API is unavailable
      */
     private fallbackEmbed(text: string): number[] {
-        // Create a simple 768-dim vector based on text characteristics
+        // Create a simple 3072-dim vector based on text characteristics
         // This is for fallback only - not semantically meaningful
-        const dim = 768;  // Match Gemini text-embedding-004 dimension
+        const dim = 3072;  // Match Gemini gemini-embedding-001 dimension
         const embedding = new Array(dim).fill(0);
 
         const normalized = text.toLowerCase().trim();
