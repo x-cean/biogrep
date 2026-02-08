@@ -20,9 +20,16 @@ const CHUNK_CONFIG = {
  */
 export interface IndexProgress {
     phase: "scanning" | "reading" | "chunking" | "embedding" | "storing" | "complete" | "error";
-    current: number;
-    total: number;
+    /** Current file being processed */
     currentFile?: string;
+    /** File progress */
+    fileIndex: number;
+    fileTotal: number;
+    /** Chunk progress within current file */
+    chunkIndex: number;
+    chunkTotal: number;
+    /** Total chunks processed so far */
+    totalChunksProcessed: number;
     error?: string;
 }
 
@@ -38,8 +45,11 @@ export function useIndexer() {
     const [isIndexing, setIsIndexing] = useState(false);
     const [progress, setProgress] = useState<IndexProgress>({
         phase: "complete",
-        current: 0,
-        total: 0,
+        fileIndex: 0,
+        fileTotal: 0,
+        chunkIndex: 0,
+        chunkTotal: 0,
+        totalChunksProcessed: 0,
     });
     const [indexedChunks, setIndexedChunks] = useState(0);
     const abortRef = useRef(false);
@@ -190,7 +200,7 @@ export function useIndexer() {
             await vectorStore.init(embedder.config.id, embedder.config.dimension);
             console.log("[Indexer] Vector store initialized for model:", embedder.config.id);
 
-            setProgress({ phase: "scanning", current: 0, total: 0 });
+            setProgress({ phase: "scanning", fileIndex: 0, fileTotal: 0, chunkIndex: 0, chunkTotal: 0, totalChunksProcessed: 0 });
 
             // Use fd sidecar to list all files in the folder
             console.log("[Indexer] Starting fd scan for:", folderPath);
@@ -252,13 +262,13 @@ export function useIndexer() {
                 });
 
             if (files.length === 0) {
-                setProgress({ phase: "complete", current: 0, total: 0 });
+                setProgress({ phase: "complete", fileIndex: 0, fileTotal: 0, chunkIndex: 0, chunkTotal: 0, totalChunksProcessed: 0 });
                 setIsIndexing(false);
                 return;
             }
 
             console.log(`[Indexer] Found ${files.length} files to index`);
-            setProgress({ phase: "reading", current: 0, total: files.length });
+            setProgress({ phase: "reading", fileIndex: 0, fileTotal: files.length, chunkIndex: 0, chunkTotal: 0, totalChunksProcessed: 0 });
 
             let totalChunks = 0;
 
@@ -266,12 +276,13 @@ export function useIndexer() {
                 if (abortRef.current) break;
 
                 const filePath = files[i];
-                setProgress({
+                setProgress((p) => ({
+                    ...p,
                     phase: "reading",
-                    current: i + 1,
-                    total: files.length,
+                    fileIndex: i + 1,
+                    fileTotal: files.length,
                     currentFile: filePath,
-                });
+                }));
 
                 try {
                     // Read file content (handles both text and document files)
@@ -290,7 +301,9 @@ export function useIndexer() {
                         setProgress((p) => ({
                             ...p,
                             phase: "embedding",
-                            currentFile: `${filePath} (chunk ${chunk.index + 1}/${chunks.length})`,
+                            chunkIndex: chunk.index + 1,
+                            chunkTotal: chunks.length,
+                            currentFile: filePath,
                         }));
 
                         // Generate embedding
@@ -298,7 +311,7 @@ export function useIndexer() {
                         console.log(`[Indexer] Embedded chunk ${chunk.index + 1}/${chunks.length}, dim=${embedding.length}`);
 
                         // Store in vector database
-                        setProgress((p) => ({ ...p, phase: "storing" }));
+                        setProgress((p) => ({ ...p, phase: "storing", totalChunksProcessed: totalChunks + 1 }));
                         await vectorStore.addChunk(
                             filePath,
                             chunk.index,
@@ -318,14 +331,17 @@ export function useIndexer() {
             // Update final count
             const finalCount = await vectorStore.getChunkCount();
             setIndexedChunks(finalCount);
-            setProgress({ phase: "complete", current: files.length, total: files.length });
+            setProgress({ phase: "complete", fileIndex: files.length, fileTotal: files.length, chunkIndex: 0, chunkTotal: 0, totalChunksProcessed: totalChunks });
             console.log(`[Indexer] Complete. ${totalChunks} chunks indexed.`);
         } catch (err) {
             console.error("[Indexer] Error:", err);
             setProgress({
                 phase: "error",
-                current: 0,
-                total: 0,
+                fileIndex: 0,
+                fileTotal: 0,
+                chunkIndex: 0,
+                chunkTotal: 0,
+                totalChunksProcessed: 0,
                 error: err instanceof Error ? err.message : String(err),
             });
         } finally {

@@ -166,7 +166,11 @@ function App() {
 
           {isIndexing && (
             <span className="text-yellow-400">
-              {progress.phase}: {progress.current}/{progress.total}
+              {progress.phase === "scanning" && "📂 Scanning..."}
+              {progress.phase === "reading" && `📄 Reading file ${progress.fileIndex}/${progress.fileTotal}`}
+              {progress.phase === "chunking" && `✂️ Chunking file ${progress.fileIndex}/${progress.fileTotal}`}
+              {progress.phase === "embedding" && `🧠 Embedding ${progress.chunkIndex}/${progress.chunkTotal} (file ${progress.fileIndex}/${progress.fileTotal})`}
+              {progress.phase === "storing" && `💾 Storing chunk ${progress.totalChunksProcessed}`}
               {progress.currentFile && (
                 <span className="text-gray-500 ml-2 truncate max-w-xs inline-block align-bottom">
                   {progress.currentFile.split("/").pop()}
