@@ -3,6 +3,8 @@ import { Command } from "@tauri-apps/plugin-shell";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 import { getEmbedder } from "../lib/embeddings";
 import { getVectorStore } from "../lib/vectorstore";
+import { CONFIG } from "../config";
+import { LineBuffer } from "../utils/stream";
 
 /**
  * Configuration for text chunking
@@ -93,6 +95,76 @@ export function useIndexer() {
     }, []);
 
     /**
+     * Check if a file is a document that needs rga extraction (PDF, DOCX, etc.)
+     */
+    const isDocumentFile = useCallback((path: string): boolean => {
+        const ext = path.toLowerCase().slice(path.lastIndexOf('.'));
+        return (CONFIG.FILE_READER.DOCUMENT_EXTENSIONS as readonly string[]).includes(ext);
+    }, []);
+
+    /**
+     * Supported text file extensions (read directly)
+     */
+    const TEXT_EXTENSIONS = [
+        "txt", "md", "markdown", "rst", "json", "yaml", "yml", "toml", "csv", "log",
+        "py", "js", "ts", "tsx", "jsx", "rs", "go", "java", "c", "cpp", "h", "hpp",
+        "html", "htm", "xml", "css", "scss", "sass", "sql", "sh", "bash", "zsh"
+    ];
+
+    /**
+     * Extract text from document using rga (ripgrep-all)
+     * Works with PDF, DOCX, PPTX, XLSX, etc.
+     */
+    const extractDocumentText = useCallback(async (path: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            try {
+                const command = Command.sidecar(
+                    "binaries/rga",
+                    ["--no-filename", "--no-line-number", ".", path],
+                    {
+                        env: {
+                            PATH: CONFIG.PATHS.RGA_ENV_PATH,
+                        },
+                    }
+                );
+
+                const lineBuffer = new LineBuffer();
+                const lines: string[] = [];
+
+                command.stdout.on("data", (data) => {
+                    const newLines = lineBuffer.append(data);
+                    lines.push(...newLines);
+                });
+
+                command.stderr.on("data", (_data) => {
+                    // Ignore stderr - rga often outputs warnings
+                });
+
+                command.on("close", () => {
+                    const remaining = lineBuffer.flush();
+                    lines.push(...remaining);
+                    resolve(lines.join("\n"));
+                });
+
+                command.spawn().catch(reject);
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }, []);
+
+    /**
+     * Read file content - handles both text files and documents
+     */
+    const readFileContent = useCallback(async (path: string): Promise<string> => {
+        if (isDocumentFile(path)) {
+            return extractDocumentText(path);
+        } else {
+            return readTextFile(path);
+        }
+    }, [isDocumentFile, extractDocumentText]);
+
+    /**
      * Index a folder: scan, read, chunk, embed, store
      */
     const indexFolder = useCallback(async (folderPath: string): Promise<void> => {
@@ -166,9 +238,17 @@ export function useIndexer() {
                 .split("\n")
                 .filter((f) => f.trim())
                 .filter((f) => {
-                    // Filter to text-like files
-                    const ext = f.split(".").pop()?.toLowerCase();
-                    return ["txt", "md", "markdown", "rst", "json", "yaml", "yml", "toml", "csv", "log", "py", "js", "ts", "tsx", "rs", "go", "java", "c", "cpp", "h", "hpp"].includes(ext || "");
+                    // Filter to text-like files OR documents (PDF, DOCX, etc.)
+                    const ext = f.split(".").pop()?.toLowerCase() || "";
+                    const extWithDot = "." + ext;
+
+                    // Check if it's a text file
+                    const isTextFile = TEXT_EXTENSIONS.includes(ext);
+
+                    // Check if it's a document file
+                    const isDocument = (CONFIG.FILE_READER.DOCUMENT_EXTENSIONS as readonly string[]).includes(extWithDot);
+
+                    return isTextFile || isDocument;
                 });
 
             if (files.length === 0) {
@@ -194,8 +274,8 @@ export function useIndexer() {
                 });
 
                 try {
-                    // Read file content
-                    const content = await readTextFile(filePath);
+                    // Read file content (handles both text and document files)
+                    const content = await readFileContent(filePath);
                     if (!content.trim()) continue;
 
                     // Chunk the content
