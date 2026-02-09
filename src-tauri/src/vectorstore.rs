@@ -104,6 +104,20 @@ impl VectorStore {
             [],
         )?;
 
+        // Migration: Add file_id column to existing documents table if missing
+        // This handles databases created before the persistent RAG feature
+        let has_file_id: bool = {
+            let mut stmt = conn.prepare(
+                "SELECT COUNT(*) FROM pragma_table_info('documents') WHERE name = 'file_id'",
+            )?;
+            let count: i64 = stmt.query_row([], |row| row.get(0))?;
+            count > 0
+        };
+
+        if !has_file_id {
+            conn.execute("ALTER TABLE documents ADD COLUMN file_id INTEGER", [])?;
+        }
+
         // Create virtual table for vector storage with dynamic dimension
         // Note: dimension is validated by the caller (frontend knows the correct dimension)
         conn.execute(
