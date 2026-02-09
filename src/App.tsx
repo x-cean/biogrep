@@ -8,6 +8,7 @@ import { SearchBar } from "./components/SearchBar";
 import { TabBar } from "./components/TabBar";
 import { CloudWarningDialog } from "./components/CloudWarningDialog";
 import { ChatPanel } from "./components/ChatPanel";
+import { KnowledgeBasePanel } from "./components/KnowledgeBasePanel";
 import { FileResultsList, ContentResultsList, DocResultsList } from "./components/ResultsList";
 import { TabType, FocusedFile } from "./types";
 
@@ -34,9 +35,11 @@ function App() {
     cancelIndexing,
     loadChunkCount,
     clearIndex,
+    deleteFolder,
     isIndexing,
     progress,
     indexedChunks,
+    indexedFolders,
   } = useIndexer();
 
   // Load chunk count on mount
@@ -141,64 +144,65 @@ function App() {
         />
 
         {/* Indexing Controls */}
-        <div className="px-4 py-2 border-b border-gray-800 flex items-center gap-3 text-xs">
-          <button
-            onClick={() => searchPath && indexFolder(searchPath)}
-            disabled={isIndexing || !searchPath}
-            className={`px-3 py-1.5 rounded transition-colors ${isIndexing
-              ? "bg-yellow-600 cursor-wait"
-              : searchPath
-                ? "bg-blue-600 hover:bg-blue-500"
-                : "bg-gray-700 cursor-not-allowed"
-              }`}
-          >
-            {isIndexing ? "Indexing..." : "📚 Index Folder"}
-          </button>
-
-          {isIndexing && (
+        <div className="px-4 py-2 border-b border-gray-800 flex flex-col gap-2 text-xs">
+          <div className="flex items-center gap-3">
             <button
-              onClick={cancelIndexing}
-              className="px-2 py-1 bg-red-600 hover:bg-red-500 rounded text-xs"
+              onClick={() => searchPath && indexFolder(searchPath)}
+              disabled={isIndexing || !searchPath}
+              className={`px-3 py-1.5 rounded transition-colors ${isIndexing
+                ? "bg-yellow-600 cursor-wait"
+                : searchPath
+                  ? "bg-blue-600 hover:bg-blue-500"
+                  : "bg-gray-700 cursor-not-allowed"
+                }`}
             >
-              Cancel
+              {isIndexing ? "Indexing..." : "📚 Index Folder"}
             </button>
-          )}
 
-          {isIndexing && (
-            <span className="text-yellow-400">
-              {progress.phase === "scanning" && "📂 Scanning..."}
-              {progress.phase === "reading" && `📄 Reading file ${progress.fileIndex}/${progress.fileTotal}`}
-              {progress.phase === "chunking" && `✂️ Chunking file ${progress.fileIndex}/${progress.fileTotal}`}
-              {progress.phase === "embedding" && `🧠 Embedding ${progress.chunkIndex}/${progress.chunkTotal} (file ${progress.fileIndex}/${progress.fileTotal})`}
-              {progress.phase === "storing" && `💾 Storing chunk ${progress.totalChunksProcessed}`}
-              {progress.currentFile && (
-                <span className="text-gray-500 ml-2 truncate max-w-xs inline-block align-bottom">
-                  {progress.currentFile.split("/").pop()}
-                </span>
-              )}
-            </span>
-          )}
-
-          {!isIndexing && indexedChunks > 0 && (
-            <>
-              <span className="text-green-400">
-                📚 {indexedChunks} chunks indexed • RAG enabled
-              </span>
+            {isIndexing && (
               <button
-                onClick={clearIndex}
-                className="px-2 py-1 bg-gray-700 hover:bg-red-600 rounded text-xs transition-colors"
-                title="Clear all indexed data"
+                onClick={cancelIndexing}
+                className="px-2 py-1 bg-red-600 hover:bg-red-500 rounded text-xs"
               >
-                🗑️ Clear
+                Cancel
               </button>
-            </>
-          )}
+            )}
 
-          {!isIndexing && indexedChunks === 0 && (
-            <span className="text-gray-500">
-              No knowledge base — index a folder to enable RAG
-            </span>
-          )}
+            {isIndexing && (
+              <span className="text-yellow-400">
+                {progress.phase === "scanning" && "📂 Scanning..."}
+                {progress.phase === "reading" && `📄 Checking file ${progress.fileIndex}/${progress.fileTotal}`}
+                {progress.phase === "chunking" && `✂️ Chunking file ${progress.fileIndex}/${progress.fileTotal}`}
+                {progress.phase === "embedding" && `🧠 Embedding ${progress.chunkIndex}/${progress.chunkTotal}`}
+                {progress.phase === "storing" && `💾 Storing...`}
+                {progress.filesSkipped > 0 && (
+                  <span className="text-gray-500 ml-2">
+                    ({progress.filesSkipped} unchanged)
+                  </span>
+                )}
+                {progress.currentFile && (
+                  <span className="text-gray-500 ml-2 truncate max-w-xs inline-block align-bottom">
+                    {progress.currentFile.split("/").pop()}
+                  </span>
+                )}
+              </span>
+            )}
+
+            {!isIndexing && indexedChunks === 0 && (
+              <span className="text-gray-500">
+                No knowledge base — index a folder to enable RAG
+              </span>
+            )}
+          </div>
+
+          {/* Knowledge Base Panel - shows indexed folders */}
+          <KnowledgeBasePanel
+            folders={indexedFolders}
+            totalChunks={indexedChunks}
+            onDeleteFolder={deleteFolder}
+            onClearAll={clearIndex}
+            isIndexing={isIndexing}
+          />
         </div>
 
 

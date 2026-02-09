@@ -21,6 +21,17 @@ pub fn run() {
             commands::is_path_indexed,
             commands::get_chunk_count,
             commands::clear_all_chunks,
+            // Folder management
+            commands::add_indexed_folder,
+            commands::get_indexed_folders,
+            commands::delete_indexed_folder,
+            commands::update_folder_stats,
+            // File management
+            commands::add_indexed_file,
+            commands::get_indexed_file,
+            commands::is_file_stale,
+            commands::delete_file_chunks,
+            commands::update_file_chunk_count,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
