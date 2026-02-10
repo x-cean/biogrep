@@ -111,6 +111,22 @@ export class VectorStoreClient {
     }
 
     /**
+     * Search for similar documents filtered to specific folders
+     */
+    async searchByFolders(
+        queryEmbedding: number[],
+        folderIds: number[],
+        limit: number = 10
+    ): Promise<VectorSearchResult[]> {
+        this.ensureInitialized();
+        return invoke<VectorSearchResult[]>("search_vectors_by_folders", {
+            queryEmbedding,
+            folderIds,
+            limit,
+        });
+    }
+
+    /**
      * Delete all chunks for a path
      */
     async deletePath(path: string): Promise<number> {

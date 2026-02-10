@@ -19,6 +19,7 @@ export interface SearchContext {
  */
 export interface UseChatOptions {
     enableRAG?: boolean;  // Whether to auto-retrieve from knowledge base
+    activeFolderIds?: number[];  // Filter RAG to specific folders (empty = all)
 }
 
 /**
@@ -32,7 +33,7 @@ export interface UseChatOptions {
  * - Conversation clearing
  */
 export function useChat(options: UseChatOptions = {}) {
-    const { enableRAG = false } = options;
+    const { enableRAG = false, activeFolderIds } = options;
 
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -148,8 +149,8 @@ export function useChat(options: UseChatOptions = {}) {
             // If RAG is enabled, search the knowledge base first
             let ragContext = "";
             if (enableRAG) {
-                console.log("[Chat] RAG enabled, searching knowledge base...");
-                const ragResults = await ragSearch.search(content, { vectorLimit: 5 });
+                console.log(`[Chat] RAG enabled, searching knowledge base...${activeFolderIds?.length ? ` (folders: ${activeFolderIds.join(',')})` : ' (all folders)'}`);
+                const ragResults = await ragSearch.search(content, { vectorLimit: 5, folderIds: activeFolderIds });
                 if (ragResults.length > 0) {
                     ragContext = ragSearch.formatContext(ragResults);
                     console.log(`[Chat] Found ${ragResults.length} relevant chunks from knowledge base`);
@@ -179,7 +180,7 @@ export function useChat(options: UseChatOptions = {}) {
         } finally {
             setIsLoading(false);
         }
-    }, [messages, buildContextString, enableRAG, ragSearch]);
+    }, [messages, buildContextString, enableRAG, activeFolderIds, ragSearch]);
 
     /**
      * Clear the conversation history

@@ -204,6 +204,76 @@ impl VectorStore {
         results.collect()
     }
 
+    /// Search for similar documents, filtered to specific folders
+    /// Uses post-filtering: fetches extra candidates from vector search,
+    /// then filters to only include results from the specified folders
+    pub fn search_by_folders(
+        &self,
+        query_embedding: &[f32],
+        folder_ids: &[i64],
+        limit: usize,
+    ) -> Result<Vec<VectorSearchResult>, rusqlite::Error> {
+        if folder_ids.is_empty() {
+            // No folder filter = search all
+            return self.search(query_embedding, limit);
+        }
+
+        let embedding_blob: Vec<u8> = query_embedding
+            .iter()
+            .flat_map(|f| f.to_le_bytes())
+            .collect();
+
+        // Fetch extra candidates (3x limit) to account for post-filtering
+        let fetch_limit = limit * 3;
+
+        // Build the folder_ids IN clause dynamically
+        let placeholders: Vec<String> = folder_ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 3))
+            .collect();
+        let in_clause = placeholders.join(", ");
+
+        let sql = format!(
+            "SELECT d.id, d.path, d.chunk_index, d.content, v.distance
+             FROM document_vectors v
+             INNER JOIN documents d ON d.id = v.id
+             INNER JOIN indexed_files f ON d.file_id = f.id
+             WHERE v.embedding MATCH ?1 AND k = ?2
+               AND f.folder_id IN ({})
+             ORDER BY v.distance
+             LIMIT ?{}",
+            in_clause,
+            folder_ids.len() + 3
+        );
+
+        let mut stmt = self.conn.prepare(&sql)?;
+
+        // Build params: embedding_blob, fetch_limit, folder_id1, folder_id2, ..., limit
+        let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+        param_values.push(Box::new(embedding_blob));
+        param_values.push(Box::new(fetch_limit as i64));
+        for folder_id in folder_ids {
+            param_values.push(Box::new(*folder_id));
+        }
+        param_values.push(Box::new(limit as i64));
+
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            param_values.iter().map(|p| p.as_ref()).collect();
+
+        let results = stmt.query_map(param_refs.as_slice(), |row| {
+            Ok(VectorSearchResult {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                chunk_index: row.get(2)?,
+                content: row.get(3)?,
+                distance: row.get(4)?,
+            })
+        })?;
+
+        results.collect()
+    }
+
     /// Delete all chunks for a given path
     pub fn delete_path(&self, path: &str) -> Result<usize, rusqlite::Error> {
         // Get IDs to delete from vector table

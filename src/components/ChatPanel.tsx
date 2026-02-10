@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { ChatMessage } from "../lib/llm";
 import { SearchContext } from "../hooks/useChat";
 import { FocusedFile } from "../types";
+import { IndexedFolder } from "../lib/vectorstore";
 
 interface ChatPanelProps {
     messages: ChatMessage[];
@@ -14,6 +15,10 @@ interface ChatPanelProps {
     onToggleCollapse: () => void;
     focusedFile?: FocusedFile | null;
     onClearFocusedFile?: () => void;
+    indexedFolders?: IndexedFolder[];
+    activeFolderIds?: number[];
+    onToggleFolder?: (folderId: number) => void;
+    onSelectAllFolders?: () => void;
 }
 
 export function ChatPanel({
@@ -27,6 +32,10 @@ export function ChatPanel({
     onToggleCollapse,
     focusedFile,
     onClearFocusedFile,
+    indexedFolders = [],
+    activeFolderIds = [],
+    onToggleFolder,
+    onSelectAllFolders,
 }: ChatPanelProps) {
     const [input, setInput] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -139,6 +148,40 @@ export function ChatPanel({
                     </button>
                 </div>
             </div>
+
+            {/* Folder selector - only show when >1 folder is indexed */}
+            {indexedFolders.length > 1 && (
+                <div className="px-3 py-1.5 border-b border-gray-700 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                            onClick={onSelectAllFolders}
+                            className={`px-2 py-0.5 rounded-full text-xs transition-colors ${activeFolderIds.length === 0
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                                }`}
+                        >
+                            All
+                        </button>
+                        {indexedFolders.map((folder) => {
+                            const isActive = activeFolderIds.includes(folder.id);
+                            const label = folder.label || folder.path.split("/").pop() || folder.path;
+                            return (
+                                <button
+                                    key={folder.id}
+                                    onClick={() => onToggleFolder?.(folder.id)}
+                                    className={`px-2 py-0.5 rounded-full text-xs transition-colors truncate max-w-[120px] ${isActive
+                                            ? "bg-blue-600 text-white"
+                                            : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                                        }`}
+                                    title={folder.path}
+                                >
+                                    📁 {label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Messages area */}
             <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">

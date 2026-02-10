@@ -50,6 +50,21 @@ function App() {
   // Enable RAG when knowledge base has indexed chunks
   const isRAGEnabled = indexedChunks > 0;
 
+  // Folder-scoped RAG state (empty = search all folders)
+  const [activeFolderIds, setActiveFolderIds] = useState<number[]>([]);
+
+  const handleToggleFolder = useCallback((folderId: number) => {
+    setActiveFolderIds(prev =>
+      prev.includes(folderId)
+        ? prev.filter(id => id !== folderId)
+        : [...prev, folderId]
+    );
+  }, []);
+
+  const handleSelectAllFolders = useCallback(() => {
+    setActiveFolderIds([]);  // Empty = search all
+  }, []);
+
   // Chat state - enable RAG if we have indexed chunks
   const {
     messages,
@@ -57,7 +72,7 @@ function App() {
     error: chatError,
     sendMessage,
     clearChat
-  } = useChat({ enableRAG: isRAGEnabled });
+  } = useChat({ enableRAG: isRAGEnabled, activeFolderIds: activeFolderIds.length > 0 ? activeFolderIds : undefined });
   const [isChatCollapsed, setIsChatCollapsed] = useState(true);
 
   // File reader for focused file
@@ -289,6 +304,10 @@ function App() {
         onToggleCollapse={() => setIsChatCollapsed(!isChatCollapsed)}
         focusedFile={focusedFile}
         onClearFocusedFile={handleClearFocusedFile}
+        indexedFolders={indexedFolders}
+        activeFolderIds={activeFolderIds}
+        onToggleFolder={handleToggleFolder}
+        onSelectAllFolders={handleSelectAllFolders}
       />
 
       {/* Cloud folder warning dialog */}

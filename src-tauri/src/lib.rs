@@ -17,6 +17,7 @@ pub fn run() {
             commands::init_vectorstore,
             commands::add_document_chunk,
             commands::search_vectors,
+            commands::search_vectors_by_folders,
             commands::delete_indexed_path,
             commands::is_path_indexed,
             commands::get_chunk_count,

@@ -24,10 +24,12 @@ export interface RAGResult {
 export function useRAGSearch() {
     /**
      * Search the vector store using semantic similarity
+     * When folderIds is provided, only search within those folders
      */
     const searchVectors = useCallback(async (
         query: string,
-        limit: number = 5
+        limit: number = 5,
+        folderIds?: number[]
     ): Promise<RAGResult[]> => {
         try {
             const embedder = getEmbedder();
@@ -39,8 +41,13 @@ export function useRAGSearch() {
             // Embed the query
             const queryEmbedding = await embedder.embed(query);
 
-            // Search vector store
-            const results: VectorSearchResult[] = await vectorStore.search(queryEmbedding, limit);
+            // Search vector store — scoped to folders if provided
+            let results: VectorSearchResult[];
+            if (folderIds && folderIds.length > 0) {
+                results = await vectorStore.searchByFolders(queryEmbedding, folderIds, limit);
+            } else {
+                results = await vectorStore.search(queryEmbedding, limit);
+            }
 
             // Convert to RAGResult format
             // Lower distance = more similar, so we invert for score
@@ -83,21 +90,21 @@ export function useRAGSearch() {
 
     /**
      * Perform hybrid search (vector + optional keyword results)
-     * For proof-of-concept, primarily uses vector search
+     * When folderIds is provided, scopes vector search to those folders
      */
     const search = useCallback(async (
         query: string,
-        options: { vectorLimit?: number; keywordResults?: RAGResult[] } = {}
+        options: { vectorLimit?: number; folderIds?: number[]; keywordResults?: RAGResult[] } = {}
     ): Promise<RAGResult[]> => {
-        const { vectorLimit = 5, keywordResults = [] } = options;
+        const { vectorLimit = 5, folderIds, keywordResults = [] } = options;
 
-        // Get vector search results
-        const vectorResults = await searchVectors(query, vectorLimit);
+        // Get vector search results (scoped to folders if provided)
+        const vectorResults = await searchVectors(query, vectorLimit, folderIds);
 
         // Merge with any keyword results passed in
         const merged = mergeResults(vectorResults, keywordResults);
 
-        console.log(`[RAGSearch] Found ${vectorResults.length} vector + ${keywordResults.length} keyword = ${merged.length} merged results`);
+        console.log(`[RAGSearch] Found ${vectorResults.length} vector + ${keywordResults.length} keyword = ${merged.length} merged results${folderIds ? ` (folders: ${folderIds.join(',')})` : ''}`);
 
         return merged;
     }, [searchVectors, mergeResults]);
