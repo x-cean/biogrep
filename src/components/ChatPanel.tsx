@@ -19,6 +19,7 @@ interface ChatPanelProps {
     activeFolderIds?: number[];
     onToggleFolder?: (folderId: number) => void;
     onSelectAllFolders?: () => void;
+    width?: number; // Optional width in pixels
 }
 
 export function ChatPanel({
@@ -36,6 +37,7 @@ export function ChatPanel({
     activeFolderIds = [],
     onToggleFolder,
     onSelectAllFolders,
+    width,
 }: ChatPanelProps) {
     const [input, setInput] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -91,7 +93,10 @@ export function ChatPanel({
 
     // Expanded state - full chat panel that takes layout space
     return (
-        <div className="flex-shrink-0 w-80 h-full flex flex-col bg-gray-800 border-l border-gray-700 relative">
+        <div
+            className="flex-shrink-0 h-full flex flex-col bg-gray-800 border-l border-gray-700 relative"
+            style={{ width: width ? `${width}px` : "20rem" }}
+        >
             {/* Header */}
             <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 flex-shrink-0">
                 <div className="flex items-center gap-2 min-w-0 flex-1">

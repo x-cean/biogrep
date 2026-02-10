@@ -66,6 +66,8 @@ function App() {
   }, []);
 
   // Chat state - enable RAG if we have indexed chunks
+
+  // Chat state - enable RAG if we have indexed chunks
   const {
     messages,
     isLoading: isChatLoading,
@@ -74,6 +76,45 @@ function App() {
     clearChat
   } = useChat({ enableRAG: isRAGEnabled, activeFolderIds: activeFolderIds.length > 0 ? activeFolderIds : undefined });
   const [isChatCollapsed, setIsChatCollapsed] = useState(true);
+  const [chatWidth, setChatWidth] = useState(320); // Default width
+  const [isResizing, setIsResizing] = useState(false);
+
+  // Resize handlers
+  const startResizing = useCallback(() => {
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback(
+    (mouseMoveEvent: { clientX: number }) => {
+      if (isResizing) {
+        const newWidth = window.innerWidth - mouseMoveEvent.clientX;
+        // Enforce min/max width constraints
+        if (newWidth >= 300 && newWidth <= 800) {
+          setChatWidth(newWidth);
+        }
+      }
+    },
+    [isResizing]
+  );
+
+  // Global event listeners for resizing
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener("mousemove", resize);
+      window.addEventListener("mouseup", stopResizing);
+    } else {
+      window.removeEventListener("mousemove", resize);
+      window.removeEventListener("mouseup", stopResizing);
+    }
+    return () => {
+      window.removeEventListener("mousemove", resize);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+  }, [isResizing, resize, stopResizing]);
 
   // File reader for focused file
   const { readFile, isReading: isReadingFile } = useFileReader();
@@ -293,6 +334,15 @@ function App() {
       </div>
 
       {/* Right side: Chat Panel */}
+      {/* Resizer Handle - only visible when chat is expanded */}
+      {!isChatCollapsed && (
+        <div
+          className={`w-1 hover:w-1.5 bg-transparent hover:bg-blue-500 cursor-col-resize flex-shrink-0 transition-all z-10 -mr-0.5 ${isResizing ? "bg-blue-600 w-1.5" : ""
+            }`}
+          onMouseDown={startResizing}
+        />
+      )}
+
       <ChatPanel
         messages={messages}
         isLoading={isChatLoading || isReadingFile}
@@ -308,7 +358,9 @@ function App() {
         activeFolderIds={activeFolderIds}
         onToggleFolder={handleToggleFolder}
         onSelectAllFolders={handleSelectAllFolders}
+        width={chatWidth}
       />
+
 
       {/* Cloud folder warning dialog */}
       <CloudWarningDialog
