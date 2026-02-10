@@ -149,15 +149,42 @@ export function ChatPanel({
                 </div>
             </div>
 
-            {/* Folder selector - only show when >1 folder is indexed */}
-            {indexedFolders.length > 1 && (
+            {/* RAG mode indicator */}
+            <div className="px-3 py-1.5 border-b border-gray-700 flex-shrink-0">
+                {indexedFolders.length === 0 ? (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                        <span>🤖</span>
+                        <span>General chat — no knowledge base</span>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-1.5 text-xs text-green-400">
+                        <span>📚</span>
+                        <span>
+                            {activeFolderIds.length === 0
+                                ? `All folders (${indexedFolders.reduce((sum, f) => sum + f.chunk_count, 0)} chunks)`
+                                : activeFolderIds.length === 1
+                                    ? (() => {
+                                        const folder = indexedFolders.find(f => f.id === activeFolderIds[0]);
+                                        return folder
+                                            ? `${folder.label || folder.path.split("/").pop()} (${folder.chunk_count} chunks)`
+                                            : "1 folder";
+                                    })()
+                                    : `${activeFolderIds.length} of ${indexedFolders.length} folders`
+                            }
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            {/* Folder selector - show when any folders are indexed */}
+            {indexedFolders.length >= 1 && (
                 <div className="px-3 py-1.5 border-b border-gray-700 flex-shrink-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                         <button
                             onClick={onSelectAllFolders}
                             className={`px-2 py-0.5 rounded-full text-xs transition-colors ${activeFolderIds.length === 0
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-700 text-gray-400 hover:bg-gray-600"
                                 }`}
                         >
                             All
@@ -170,8 +197,8 @@ export function ChatPanel({
                                     key={folder.id}
                                     onClick={() => onToggleFolder?.(folder.id)}
                                     className={`px-2 py-0.5 rounded-full text-xs transition-colors truncate max-w-[120px] ${isActive
-                                            ? "bg-blue-600 text-white"
-                                            : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                                        ? "bg-blue-600 text-white"
+                                        : "bg-gray-700 text-gray-400 hover:bg-gray-600"
                                         }`}
                                     title={folder.path}
                                 >
@@ -188,19 +215,35 @@ export function ChatPanel({
                 {messages.length === 0 && (
                     <div className="text-center text-gray-500 text-sm py-8">
                         <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-700 flex items-center justify-center">
-                            <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
+                            {indexedFolders.length > 0 ? (
+                                <span className="text-xl">📚</span>
+                            ) : (
+                                <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                            )}
                         </div>
-                        <p className="font-medium text-gray-400">Ask about your files</p>
-                        {searchContext && searchContext.query ? (
-                            <p className="mt-2 text-xs text-gray-600">
-                                Try: "Summarize these results" or<br />"Which file is most relevant?"
-                            </p>
+                        {indexedFolders.length > 0 ? (
+                            <>
+                                <p className="font-medium text-gray-400">Ask about your documents</p>
+                                <p className="mt-2 text-xs text-gray-600">
+                                    The AI will search your knowledge base<br />for relevant context automatically
+                                </p>
+                            </>
+                        ) : searchContext && searchContext.query ? (
+                            <>
+                                <p className="font-medium text-gray-400">Ask about your search</p>
+                                <p className="mt-2 text-xs text-gray-600">
+                                    Try: "Summarize these results" or<br />"Which file is most relevant?"
+                                </p>
+                            </>
                         ) : (
-                            <p className="mt-2 text-xs text-gray-600">
-                                Search for something first,<br />then ask questions here
-                            </p>
+                            <>
+                                <p className="font-medium text-gray-400">General chat</p>
+                                <p className="mt-2 text-xs text-gray-600">
+                                    No knowledge base indexed yet.<br />Index a folder to enable RAG
+                                </p>
+                            </>
                         )}
                     </div>
                 )}
@@ -242,7 +285,12 @@ export function ChatPanel({
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Ask about your files..."
+                        placeholder={indexedFolders.length > 0
+                            ? activeFolderIds.length === 1
+                                ? `Ask about ${indexedFolders.find(f => f.id === activeFolderIds[0])?.path.split("/").pop() || "folder"}...`
+                                : "Ask about your knowledge base..."
+                            : "Ask anything..."
+                        }
                         disabled={isLoading}
                         className="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 placeholder-gray-500"
                         rows={2}
