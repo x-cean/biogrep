@@ -18,6 +18,7 @@ pub fn run() {
             commands::add_document_chunk,
             commands::search_vectors,
             commands::search_vectors_by_folders,
+            commands::search_hybrid,
             commands::delete_indexed_path,
             commands::is_path_indexed,
             commands::get_chunk_count,

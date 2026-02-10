@@ -127,6 +127,24 @@ export class VectorStoreClient {
     }
 
     /**
+     * Search for similar documents using Hybrid Search (Vector + Keyword) with RRF
+     */
+    async searchHybrid(
+        queryEmbedding: number[],
+        queryText: string,
+        folderIds: number[],
+        limit: number = 10
+    ): Promise<VectorSearchResult[]> {
+        this.ensureInitialized();
+        return invoke<VectorSearchResult[]>("search_hybrid", {
+            queryEmbedding,
+            queryText,
+            folderIds,
+            limit,
+        });
+    }
+
+    /**
      * Delete all chunks for a path
      */
     async deletePath(path: string): Promise<number> {

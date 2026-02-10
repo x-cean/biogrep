@@ -104,6 +104,70 @@ impl VectorStore {
             [],
         )?;
 
+        // Create FTS5 virtual table for full-text search
+        conn.execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
+                content,
+                path,
+                chunk_index UNINDEXED,
+                file_id UNINDEXED,
+                content='documents',
+                content_rowid='id'
+            )",
+            [],
+        )?;
+
+        // Create triggers to keep FTS index in sync with documents table
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS documents_ai AFTER INSERT ON documents BEGIN
+                INSERT INTO documents_fts(rowid, content, path, chunk_index, file_id) 
+                VALUES (new.id, new.content, new.path, new.chunk_index, new.file_id);
+            END",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS documents_ad AFTER DELETE ON documents BEGIN
+                INSERT INTO documents_fts(documents_fts, rowid, content, path, chunk_index, file_id) 
+                VALUES ('delete', old.id, old.content, old.path, old.chunk_index, old.file_id);
+            END",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
+                INSERT INTO documents_fts(documents_fts, rowid, content, path, chunk_index, file_id) 
+                VALUES ('delete', old.id, old.content, old.path, old.chunk_index, old.file_id);
+                INSERT INTO documents_fts(rowid, content, path, chunk_index, file_id) 
+                VALUES (new.id, new.content, new.path, new.chunk_index, new.file_id);
+            END",
+            [],
+        )?;
+
+        // Check if we need to backfill FTS table
+        let fts_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM documents_fts", [], |row| row.get(0))
+            .unwrap_or(0);
+
+        let doc_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM documents", [], |row| row.get(0))
+            .unwrap_or(0);
+
+        if fts_count == 0 && doc_count > 0 {
+            // Backfill FTS
+            // We use 'rebuild' command or manual insert? Manual insert is safer for external content tables
+            // But here we are using external content table mechanism?
+            // Wait, I defined FTS table as: content='documents', content_rowid='id'
+            // This means it IS an external content table.
+
+            // For external content tables, we need to insert into the FTS table to index existing content.
+            conn.execute(
+                "INSERT INTO documents_fts(rowid, content, path, chunk_index, file_id) 
+                 SELECT id, content, path, chunk_index, file_id FROM documents",
+                [],
+            )?;
+        }
+
         // Migration: Add file_id column to existing documents table if missing
         // This handles databases created before the persistent RAG feature
         let has_file_id: bool = {
@@ -272,6 +336,147 @@ impl VectorStore {
         })?;
 
         results.collect()
+    }
+
+    /// Perform hybrid search using Reciprocal Rank Fusion (RRF)
+    /// Combines Vector Search (Semantic) + FTS5 Search (Keyword)
+    pub fn search_hybrid(
+        &self,
+        query_embedding: &[f32],
+        query_text: &str,
+        folder_ids: &[i64],
+        limit: usize,
+    ) -> Result<Vec<VectorSearchResult>, rusqlite::Error> {
+        // Constants for RRF
+        let k = 60.0; // RRF constant (usually 60)
+        let vector_limit = 50; // Get top 50 candidates from each source
+        let fts_limit = 50;
+
+        // 1. Run Vector Search
+        // We reuse the existing search_by_folders logic but with a higher limit
+        let vector_results = self.search_by_folders(query_embedding, folder_ids, vector_limit)?;
+
+        // 2. Run FTS Search
+        // We need to construct the FTS query carefully
+        let fts_query = format!(
+            "SELECT d.id, d.path, d.chunk_index, d.content 
+             FROM documents_fts fts
+             JOIN documents d ON fts.rowid = d.id
+             INNER JOIN indexed_files f ON d.file_id = f.id
+             WHERE fts.content MATCH ?1
+             {}
+             LIMIT ?2",
+            if !folder_ids.is_empty() {
+                // If folders are selected, we need to filter
+                // Since FTS5 doesn't support IN clause efficiently on external columns in the virtual table query itself easily without join,
+                // we join with indexed_files and filter there.
+                let placeholders: Vec<String> =
+                    folder_ids.iter().map(|_| "?".to_string()).collect();
+                format!("AND f.folder_id IN ({})", placeholders.join(", "))
+            } else {
+                "".to_string()
+            }
+        );
+
+        let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+        // Sanitize query text for FTS5 (basic quoting)
+        let sanitized_query = format!("\"{}\"", query_text.replace("\"", "\"\""));
+        params.push(Box::new(sanitized_query));
+
+        if !folder_ids.is_empty() {
+            for id in folder_ids {
+                params.push(Box::new(*id));
+            }
+        }
+        params.push(Box::new(fts_limit as i64));
+
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
+
+        let mut fts_stmt = self.conn.prepare(&fts_query)?;
+        let fts_results = fts_stmt.query_map(param_refs.as_slice(), |row| {
+            Ok((
+                row.get::<_, i64>(0)?,    // id
+                row.get::<_, String>(1)?, // path
+                row.get::<_, i32>(2)?,    // chunk_index
+                row.get::<_, String>(3)?, // content
+            ))
+        })?;
+
+        // 3. Compute RRF Scores
+        use std::collections::HashMap;
+
+        struct ScoredDoc {
+            path: String,
+            chunk_index: i32,
+            content: String,
+            score: f64,
+            vector_dist: Option<f64>, // For debugging/tie-breaking
+        }
+
+        let mut rrf_scores: HashMap<i64, ScoredDoc> = HashMap::new();
+
+        // Process Vector Results
+        for (rank, res) in vector_results.iter().enumerate() {
+            let rrf_score = 1.0 / (k + (rank as f64) + 1.0);
+            rrf_scores.insert(
+                res.id,
+                ScoredDoc {
+                    path: res.path.clone(),
+                    chunk_index: res.chunk_index,
+                    content: res.content.clone(),
+                    score: rrf_score,
+                    vector_dist: Some(res.distance),
+                },
+            );
+        }
+
+        // Process FTS Results
+        for (rank, res) in fts_results.enumerate() {
+            let (id, path, chunk_index, content) = res?;
+
+            let entry = rrf_scores.entry(id).or_insert(ScoredDoc {
+                path,
+                chunk_index,
+                content,
+                score: 0.0,
+                vector_dist: None,
+            });
+
+            entry.score += 1.0 / (k + (rank as f64) + 1.0);
+        }
+
+        // 4. Sort and Format Results
+        let mut final_results: Vec<VectorSearchResult> = rrf_scores
+            .into_iter()
+            .map(|(id, doc)| VectorSearchResult {
+                id,
+                path: doc.path,
+                chunk_index: doc.chunk_index,
+                content: doc.content,
+                // Invert RRF score to match "distance" concept (lower is better)?
+                // No, standard VectorSearchResult expects distance.
+                // Let's use (1.0 - normalized_score) as a proxy for distance, or just return score as distance (but inverted).
+                // Actually, let's just return -score so lower is "better" (since sorting usually ASC for distance).
+                // But wait, the frontend might display distance.
+                // Let's keep it simple: 1.0 / score. If score is high (good), 1/score is low (close distance).
+                distance: if doc.score > 0.0 {
+                    1.0 / doc.score
+                } else {
+                    1.0
+                },
+            })
+            .collect();
+
+        // Sort by "distance" (which is 1/score, so lower is better/higher score)
+        final_results.sort_by(|a, b| {
+            a.distance
+                .partial_cmp(&b.distance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Take top N
+        Ok(final_results.into_iter().take(limit).collect())
     }
 
     /// Delete all chunks for a given path

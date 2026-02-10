@@ -81,6 +81,23 @@ pub fn search_vectors_by_folders(
         .map_err(|e| e.to_string())
 }
 
+/// Perform hybrid search using Reciprocal Rank Fusion (RRF)
+#[tauri::command]
+pub fn search_hybrid(
+    state: State<VectorStoreState>,
+    query_embedding: Vec<f32>,
+    query_text: String,
+    folder_ids: Vec<i64>,
+    limit: usize,
+) -> Result<Vec<VectorSearchResult>, String> {
+    let guard = state.0.lock().unwrap();
+    let store = guard.as_ref().ok_or("Vector store not initialized")?;
+
+    store
+        .search_hybrid(&query_embedding, &query_text, &folder_ids, limit)
+        .map_err(|e| e.to_string())
+}
+
 /// Delete all chunks for a path
 #[tauri::command]
 pub fn delete_indexed_path(state: State<VectorStoreState>, path: String) -> Result<usize, String> {

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { getEmbedder } from "../lib/embeddings";
-import { getVectorStore, VectorSearchResult } from "../lib/vectorstore";
+import { getVectorStore } from "../lib/vectorstore";
 
 /**
  * Combined RAG search result (from vector or keyword search)
@@ -41,13 +41,15 @@ export function useRAGSearch() {
             // Embed the query
             const queryEmbedding = await embedder.embed(query);
 
-            // Search vector store — scoped to folders if provided
-            let results: VectorSearchResult[];
-            if (folderIds && folderIds.length > 0) {
-                results = await vectorStore.searchByFolders(queryEmbedding, folderIds, limit);
-            } else {
-                results = await vectorStore.search(queryEmbedding, limit);
-            }
+            // Search vector store — use Hybrid Search (Vector + Keyword)
+            // This combines semantic search with full-text search using RRF
+            // If folderIds is provided (even empty [] if all selected), it handles it
+            const results = await vectorStore.searchHybrid(
+                queryEmbedding,
+                query,
+                folderIds || [],
+                limit
+            );
 
             // Convert to RAGResult format
             // Lower distance = more similar, so we invert for score
@@ -55,7 +57,10 @@ export function useRAGSearch() {
                 path: r.path,
                 content: r.content,
                 chunkIndex: r.chunk_index,
-                score: 1 / (1 + r.distance), // Normalize distance to 0-1 score
+                // In hybrid search, 'distance' is actually 1.0 / RRF_score
+                // So lower distance (higher RRF) is better.
+                // We normalize it to a score here.
+                score: 1 / (1 + r.distance),
                 source: "vector" as const,
             }));
         } catch (err) {
