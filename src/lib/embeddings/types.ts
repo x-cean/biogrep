@@ -27,8 +27,8 @@ export interface Embedder {
     /** Generate embedding for a single text */
     embed(text: string): Promise<number[]>;
 
-    /** Generate embeddings for multiple texts */
-    embedBatch?(texts: string[]): Promise<number[][]>;
+    /** Generate embeddings for multiple texts in a single batch call */
+    embedBatch(texts: string[]): Promise<number[][]>;
 }
 
 /**

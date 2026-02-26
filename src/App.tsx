@@ -229,8 +229,8 @@ function App() {
                 {progress.phase === "scanning" && "📂 Scanning..."}
                 {progress.phase === "reading" && `📄 Checking file ${progress.fileIndex}/${progress.fileTotal}`}
                 {progress.phase === "chunking" && `✂️ Chunking file ${progress.fileIndex}/${progress.fileTotal}`}
-                {progress.phase === "embedding" && `🧠 Embedding ${progress.chunkIndex}/${progress.chunkTotal}`}
-                {progress.phase === "storing" && `💾 Storing...`}
+                {progress.phase === "embedding" && `🧠 Embedding ${progress.chunkTotal} chunks...`}
+                {progress.phase === "storing" && `💾 Storing ${progress.chunkIndex}/${progress.chunkTotal}`}
                 {progress.filesSkipped > 0 && (
                   <span className="text-gray-500 ml-2">
                     ({progress.filesSkipped} unchanged)

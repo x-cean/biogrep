@@ -393,33 +393,42 @@ export function useIndexer() {
                     const chunks = chunkText(content);
                     console.log(`[Indexer] File ${i + 1}/${files.length}: ${filePath.split("/").pop()} - ${chunks.length} chunks`);
 
-                    // Embed and store each chunk
-                    for (const chunk of chunks) {
+                    // Batch embed all chunks for this file at once
+                    const chunkTexts = chunks.map(c => c.content);
+
+                    setProgress((p) => ({
+                        ...p,
+                        phase: "embedding",
+                        chunkIndex: 0,
+                        chunkTotal: chunks.length,
+                        currentFile: filePath,
+                    }));
+
+                    // embedBatch handles sub-batching (up to 100 per API call) internally
+                    const embeddings = await embedder.embedBatch(chunkTexts);
+
+                    // Store each chunk with its embedding
+                    for (let ci = 0; ci < chunks.length; ci++) {
                         if (abortRef.current) break;
 
                         setProgress((p) => ({
                             ...p,
-                            phase: "embedding",
-                            chunkIndex: chunk.index + 1,
+                            phase: "storing",
+                            chunkIndex: ci + 1,
                             chunkTotal: chunks.length,
-                            currentFile: filePath,
+                            totalChunksProcessed: totalChunks + ci + 1,
                         }));
 
-                        // Generate embedding
-                        const embedding = await embedder.embed(chunk.content);
-
-                        // Store in vector database with file_id
-                        setProgress((p) => ({ ...p, phase: "storing", totalChunksProcessed: totalChunks + 1 }));
                         await vectorStore.addChunk(
                             filePath,
-                            chunk.index,
-                            chunk.content,
-                            embedding,
+                            chunks[ci].index,
+                            chunks[ci].content,
+                            embeddings[ci],
                             fileId
                         );
-
-                        totalChunks++;
                     }
+
+                    totalChunks += chunks.length;
 
                     // Update file chunk count
                     await vectorStore.updateFileChunkCount(fileId, chunks.length);
